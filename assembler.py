@@ -10,7 +10,24 @@ shi_type_insts = {'LSHI', 'RSHI', 'ALSHI', 'ARSHI'}
 b_type_insts = {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
 j_type_insts = {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
 
-reg_codes = {'%r0', '%r1', '%r2', '%r3', '%r4', '%r5', '%r6', '%r7', '%r8', '%r9', '%r10', '%r11', '%r12', '%r13', '%r14', '%r15'}
+reg_codes : dict[str,str] = {
+    '%r0': '0',
+    '%r1': '1',
+    '%r2': '2',
+    '%r3': '3',
+    '%r4': '4',
+    '%r5': '5',
+    '%r6': '6',
+    '%r7': '7',
+    '%r8': '8',
+    '%r9': '9',
+    '%r10': 'a',
+    '%r11': 'b',
+    '%r12': 'c',
+    '%r13': 'd',
+    '%r14': 'e',
+    '%r15': 'f'
+}
 
 inst_codes : dict[str,str] = {
     'ADD': '5',
@@ -64,10 +81,10 @@ inst_codes : dict[str,str] = {
     'UC' : 'e'
 }
 
-def replaceLabel(self, label):
+def replaceLabel(label):
     def r(l):
         if (l[0] == '.'):
-            return '$' + str(self.labels[l])
+            return '$' + str(labels[l])
         else:
             return l
 
@@ -132,7 +149,7 @@ def assemble(args):
     for x in f:
         line = x.split('#')[0] # discard comment at end of line
         parts = replaceLabel(line).split()
-        if ((len(parts) > 0) and (line[0] != '.')):
+        if len(parts) > 0 and line[0] != '.':
             for part in parts:
                 sf.write(part + ' ')
             sf.write('\n')
@@ -140,13 +157,11 @@ def assemble(args):
             instr = parts.pop(0)
             if (instr in r_type_insts):
                 if (len(parts) == 2):
-                    firstReg = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((firstReg in reg_codes) and (secondReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
-                        data = '0' + secondRegNum + inst_codes[instr] + firstRegNum
-                        wf.write(data + '\n')
+                    r_src = parts.pop(0)
+                    r_dst = parts.pop(0)
+                    # i.e. ADD %r1 %r2 -> 0251
+                    if r_src in reg_codes and r_dst in reg_codes:
+                        wf.write('0' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
                     else:
                         sys.exit('Syntax Error: R-type needs two registers')
                 else:
@@ -154,8 +169,8 @@ def assemble(args):
             elif (instr in i_type_insts):
                 if (len(parts) == 2):
                     Immd = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((Immd[0] in '$') and (secondReg in reg_codes)):
+                    r_dst = parts.pop(0)
+                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
                         immdInt = int(Immd.replace('$', ''))
                         if ((immdInt > 127) or (-128 > immdInt)):
                             print('issue with ', line)
@@ -164,7 +179,7 @@ def assemble(args):
                             immediate = '{0:02x}'.format(immdInt)
                         else:
                             immediate = '{0:02x}'.format(((-1 * immdInt) ^ 255) + 1)
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = inst_codes[instr] + secondRegNum + immediate
                         wf.write(data + '\n')
                     else:
@@ -173,11 +188,11 @@ def assemble(args):
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
             elif (instr in sh_type_insts):
                 if (len(parts) == 2):
-                    firstReg = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((firstReg in reg_codes) and (secondReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    r_dst = parts.pop(0)
+                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = '8' + secondRegNum + inst_codes[instr] + firstRegNum
                         wf.write(data + '\n')
                     else:
@@ -187,14 +202,14 @@ def assemble(args):
             elif (instr in shi_type_insts):
                 if (len(parts) == 2):
                     Immd = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((Immd[0] in '$') and (secondReg in reg_codes)):
+                    r_dst = parts.pop(0)
+                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
                         immdInt = int(Immd.replace('$', ''))
                         if ((immdInt > 15) or (0 > immdInt)):
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
                             immediate = '{0:01x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = '8' + secondRegNum + inst_codes[instr] + immediate
                         wf.write(data + '\n')
                     else:
@@ -230,9 +245,9 @@ def assemble(args):
                     sys.exit('Syntax Error: Branch operations need one arg')
             elif (instr in j_type_insts):
                 if (len(parts) == 1):
-                    firstReg = parts.pop(0)
-                    if ((firstReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    if ((r_src in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
                         data = '4' + inst_codes[instr.replace('J', '')] + 'c' + firstRegNum
                         wf.write(data + '\n')
                     else:
@@ -241,9 +256,9 @@ def assemble(args):
                     sys.exit('Syntax Error: Jump operations need one arg')
             elif (instr == 'NOT'):
                 if (len(parts) == 1):
-                    firstReg = parts.pop(0)
-                    if ((firstReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    if ((r_src in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
                         data = '0' + firstRegNum + 'f0'
                         wf.write(data + '\n')
                     else:
@@ -253,15 +268,15 @@ def assemble(args):
             elif (instr == 'LUI'):
                 if (len(parts) == 2):
                     Immd = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((Immd[0] in '$') and (secondReg in reg_codes)):
+                    r_dst = parts.pop(0)
+                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
                         immdInt = int(Immd.replace('$', ''))
                         if immdInt < 0:
                             print('issue with ', line)
                             sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(immdInt))
                         else: 
                             immediate = '{0:02x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = 'f' + secondRegNum + immediate
                         wf.write(data + '\n')
                     else:
@@ -272,15 +287,15 @@ def assemble(args):
             elif (instr == 'MOVI'):
                 if (len(parts) == 2):
                     Immd = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((Immd[0] in '$') and (secondReg in reg_codes)):
+                    r_dst = parts.pop(0)
+                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
                         immdInt = int(Immd.replace('$', ''))
                         if immdInt < 0:
                             print('issue with ', line)
                             sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(immdInt))
                         else: 
                             immediate = '{0:02x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = 'd' + secondRegNum + immediate
                         wf.write(data + '\n')
                     else:
@@ -290,11 +305,11 @@ def assemble(args):
 
             elif (instr == 'LOAD'):
                 if (len(parts) == 2):
-                    firstReg = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((firstReg in reg_codes) and (secondReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    r_dst = parts.pop(0)
+                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = '4' + firstRegNum + '0' + secondRegNum
                         wf.write(data + '\n')
                     else:
@@ -304,11 +319,11 @@ def assemble(args):
 
             elif (instr == 'STOR'):
                 if (len(parts) == 2):
-                    firstReg = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((firstReg in reg_codes) and (secondReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    r_dst = parts.pop(0)
+                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = '4' + firstRegNum + '4' + secondRegNum
                         wf.write(data + '\n')
                     else:
@@ -317,11 +332,11 @@ def assemble(args):
                     sys.exit('Syntax Error: store needs two args')
             elif (instr == 'JAL'):
                 if (len(parts) == 2):
-                    firstReg = parts.pop(0)
-                    secondReg = parts.pop(0)
-                    if ((firstReg in reg_codes) and (secondReg in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(firstReg.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(secondReg.replace('%r', '')))
+                    r_src = parts.pop(0)
+                    r_dst = parts.pop(0)
+                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
+                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
+                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
                         data = '4' + firstRegNum + '8' + secondRegNum
                         wf.write(data + '\n')
                     else:
