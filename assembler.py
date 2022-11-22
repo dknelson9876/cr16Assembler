@@ -155,8 +155,8 @@ def assemble(args):
             sf.write('\n')
             address = address + 1
             instr = parts.pop(0)
-            if (instr in r_type_insts):
-                if (len(parts) == 2):
+            if (instr in r_type_insts): # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     r_src = parts.pop(0)
                     r_dst = parts.pop(0)
                     # i.e. ADD %r1 %r2 -> 0251
@@ -166,185 +166,148 @@ def assemble(args):
                         sys.exit('Syntax Error: R-type needs two registers')
                 else:
                     sys.exit('Syntax Error: R-type needs two args')
-            elif (instr in i_type_insts):
+            elif (instr in i_type_insts): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    Immd = parts.pop(0)
+                    displacement = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
-                        immdInt = int(Immd.replace('$', ''))
-                        if ((immdInt > 127) or (-128 > immdInt)):
+                    if displacement[0] == '$' and r_dst in reg_codes:
+                        parsedImm = int(displacement.replace('$', ''))
+                        if parsedImm > 127 or -128 > parsedImm:
                             print('issue with ', line)
-                            sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(immdInt))
-                        elif (immdInt >= 0): 
-                            immediate = '{0:02x}'.format(immdInt)
+                            sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsedImm))
+                        elif (parsedImm >= 0): 
+                            formattedImm = '{0:02x}'.format(parsedImm)
                         else:
-                            immediate = '{0:02x}'.format(((-1 * immdInt) ^ 255) + 1)
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = inst_codes[instr] + secondRegNum + immediate
-                        wf.write(data + '\n')
+                            formattedImm = '{0:02x}'.format(((-1 * parsedImm) ^ 255) + 1)
+                        wf.write(inst_codes[instr] + reg_codes[r_dst] + formattedImm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-            elif (instr in sh_type_insts):
+            elif (instr in sh_type_insts): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
                     r_src = parts.pop(0)
                     r_dst = parts.pop(0)
                     if ((r_src in reg_codes) and (r_dst in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = '8' + secondRegNum + inst_codes[instr] + firstRegNum
-                        wf.write(data + '\n')
+                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
                     else:
                         sys.exit('Syntax Error: shifts needs two self.REGISTERS')
                 else:
                     sys.exit('Syntax Error: shifts needs two args')
-            elif (instr in shi_type_insts):
+            elif (instr in shi_type_insts): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    Immd = parts.pop(0)
+                    displacement = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
-                        immdInt = int(Immd.replace('$', ''))
-                        if ((immdInt > 15) or (0 > immdInt)):
+                    if ((displacement[0] in '$') and (r_dst in reg_codes)):
+                        parsedImm = int(displacement.replace('$', ''))
+                        if ((parsedImm > 15) or (0 > parsedImm)):
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
-                            immediate = '{0:01x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = '8' + secondRegNum + inst_codes[instr] + immediate
-                        wf.write(data + '\n')
+                            formattedImm = '{0:01x}'.format(parsedImm)
+                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formattedImm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate shifts need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate shifts need two args')
-            elif (instr in b_type_insts):
+            elif (instr in b_type_insts): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 1):
-                    Disp = parts.pop(0)
-                    if (Disp[0] in '$'):
-                        dispInt = int(Disp.replace('$', ''))
-                        if ((dispInt > 255) or (-255 > dispInt)):
+                    displacement = parts.pop(0)
+                    if (displacement[0] == '$'): # if displacement is imm
+                        parsedDisp = int(displacement[1:]) # cut off first char
+                        if ((parsedDisp > 255) or (-255 > parsedDisp)):
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif (dispInt >= 0): 
-                            Displacement = '{0:02x}'.format(dispInt)
+                        elif (parsedDisp >= 0): 
+                            formattedDisp = '{0:02x}'.format(parsedDisp)
                         else:
-                            Displacement = '{0:02x}'.format(((-1 * dispInt) ^ 255) + 1)
-                        data = 'c' + inst_codes[instr.replace('B', '')] + Displacement
-                        wf.write(data + '\n')
-                    elif (Disp[0] == '.'):
-                        dispInt = labels[Disp] - address
-                        if ((dispInt > 255) or (-255 > dispInt)):
+                            formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
+                        wf.write('c' + inst_codes[instr[1:]] + formattedDisp + '\n')
+                    elif (displacement[0] == '.'): # if displacement is label
+                        parsedDisp = labels[displacement] - address
+                        if ((parsedDisp > 255) or (-255 > parsedDisp)):
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif (dispInt >= 0): 
-                            Displacement = '{0:02x}'.format(dispInt)
+                        elif (parsedDisp >= 0): 
+                            formattedDisp = '{0:02x}'.format(parsedDisp)
                         else:
-                            Displacement = '{0:02x}'.format(((-1 * dispInt) ^ 255) + 1)
-                        data = 'c' + inst_codes[instr.replace('B', '')] + Displacement
-                        wf.write(data + '\n')
+                            formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
+                        wf.write('c' + inst_codes[instr[1:]] + formattedDisp + '\n')
                     else:
                         sys.exit('Syntax Error: Branch operations need a displacement or label')
                 else:
                     sys.exit('Syntax Error: Branch operations need one arg')
-            elif (instr in j_type_insts):
+            elif (instr in j_type_insts): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 1):
                     r_src = parts.pop(0)
                     if ((r_src in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        data = '4' + inst_codes[instr.replace('J', '')] + 'c' + firstRegNum
-                        wf.write(data + '\n')
+                        wf.write('4' + inst_codes[instr.replace('J', '')] + 'c' + reg_codes[r_src] + '\n')
                     else:
                         sys.exit('Syntax Error: Jump operations need a register')
                 else:
                     sys.exit('Syntax Error: Jump operations need one arg')
-            elif (instr == 'NOT'):
-                if (len(parts) == 1):
-                    r_src = parts.pop(0)
-                    if ((r_src in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        data = '0' + firstRegNum + 'f0'
-                        wf.write(data + '\n')
-                    else:
-                        sys.exit('Syntax Error: NOT operation needs one register')
-                else:
-                    sys.exit('Syntax Error: NOT operation needs one arg')
-            elif (instr == 'LUI'):
+            elif (instr == 'LUI'): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    Immd = parts.pop(0)
+                    imm = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
-                        immdInt = int(Immd.replace('$', ''))
-                        if immdInt < 0:
+                    if ((imm[0] == '$') and (r_dst in reg_codes)):
+                        parsedImm = int(imm[1:])
+                        if parsedImm < 0:
                             print('issue with ', line)
-                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(immdInt))
+                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(parsedImm))
                         else: 
-                            immediate = '{0:02x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = 'f' + secondRegNum + immediate
-                        wf.write(data + '\n')
+                            formattedImm = '{0:02x}'.format(parsedImm)
+                        wf.write('f' + reg_codes[r_dst] + formattedImm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-
-            elif (instr == 'MOVI'):
+            elif (instr == 'MOVI'): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    Immd = parts.pop(0)
+                    imm = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((Immd[0] in '$') and (r_dst in reg_codes)):
-                        immdInt = int(Immd.replace('$', ''))
-                        if immdInt < 0:
+                    if ((imm[0] == '$') and (r_dst in reg_codes)):
+                        parsedImm = int(imm[1:])
+                        if parsedImm < 0:
                             print('issue with ', line)
-                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(immdInt))
+                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(parsedImm))
                         else: 
-                            immediate = '{0:02x}'.format(immdInt)
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = 'd' + secondRegNum + immediate
-                        wf.write(data + '\n')
+                            formattedImm = '{0:02x}'.format(parsedImm)
+                        wf.write('d' + reg_codes[r_dst] + formattedImm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-
-            elif (instr == 'LOAD'):
+            elif (instr == 'LOAD'): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    r_src = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = '4' + firstRegNum + '0' + secondRegNum
-                        wf.write(data + '\n')
+                    r_addr = parts.pop(0)
+                    if ((r_dst in reg_codes) and (r_addr in reg_codes)):
+                        wf.write('4' + reg_codes[r_dst] + '0' + reg_codes[r_addr] + '\n')
                     else:
                         sys.exit('Syntax Error: load needs two registers')
                 else:
                     sys.exit('Syntax Error: load needs two args')
-
-            elif (instr == 'STOR'):
+            elif (instr == 'STOR'): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
                     r_src = parts.pop(0)
-                    r_dst = parts.pop(0)
-                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = '4' + firstRegNum + '4' + secondRegNum
-                        wf.write(data + '\n')
+                    r_addr = parts.pop(0)
+                    if ((r_src in reg_codes) and (r_addr in reg_codes)):
+                        wf.write('4' + reg_codes[r_src] + '4' + reg_codes[r_addr] + '\n')
                     else:
                         sys.exit('Syntax Error: store needs two registers')
                 else:
                     sys.exit('Syntax Error: store needs two args')
-            elif (instr == 'JAL'):
+            elif (instr == 'JAL'): # ----------------------------------------------------------------------------------------
                 if (len(parts) == 2):
-                    r_src = parts.pop(0)
-                    r_dst = parts.pop(0)
-                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
-                        firstRegNum = '{0:01x}'.format(int(r_src.replace('%r', '')))
-                        secondRegNum = '{0:01x}'.format(int(r_dst.replace('%r', '')))
-                        data = '4' + firstRegNum + '8' + secondRegNum
+                    r_link = parts.pop(0)
+                    r_target = parts.pop(0)
+                    if ((r_link in reg_codes) and (r_target in reg_codes)):
+                        data = '4' + reg_codes[r_link] + '8' + reg_codes[r_target]
                         wf.write(data + '\n')
                     else:
                         sys.exit('Syntax Error: JAL needs two registers')
                 else:
                     sys.exit('Syntax Error: JAL needs two args')
 
-            else:
+            else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
 
     # while(address < 1023):
