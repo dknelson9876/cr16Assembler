@@ -157,8 +157,8 @@ def assemble(args):
             instr = parts.pop(0)
             if instr in r_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_src, r_dst = parts
                     # i.e. ADD %r1 %r2 -> 0251
+                    r_src, r_dst = parts
                     if r_src in reg_codes and r_dst in reg_codes:
                         wf.write('0' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
                     else:
@@ -169,15 +169,16 @@ def assemble(args):
                 if len(parts) == 2:
                     displacement, r_dst = parts
                     if displacement[0] == '$' and r_dst in reg_codes:
-                        parsedImm = int(displacement.replace('$', ''))
-                        if parsedImm > 127 or -128 > parsedImm:
+                        parsed_imm = int(displacement.replace('$', ''))
+                        if parsed_imm > 127 or -128 > parsed_imm:
                             print('issue with ', line)
-                            sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsedImm))
-                        elif parsedImm >= 0: 
-                            formattedImm = '{0:02x}'.format(parsedImm)
+                            sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsed_imm))
+                        elif parsed_imm >= 0: 
+                            formatted_imm = f'{parsed_imm:02x}'
                         else:
-                            formattedImm = '{0:02x}'.format(((-1 * parsedImm) ^ 255) + 1)
-                        wf.write(inst_codes[instr] + reg_codes[r_dst] + formattedImm + '\n')
+                            twos_comp_imm = ((-1 * parsed_imm) ^ 255) + 1
+                            formatted_imm = f'{twos_comp_imm:02x}'
+                        wf.write(inst_codes[instr] + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
@@ -195,12 +196,12 @@ def assemble(args):
                 if len(parts) == 2:
                     imm, r_dst = parts
                     if imm[0] == '$' and r_dst in reg_codes:
-                        parsedImm = int(imm[1:])
-                        if parsedImm > 15 or 0 > parsedImm:
+                        parsed_imm = int(imm[1:])
+                        if parsed_imm > 15 or 0 > parsed_imm:
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
-                            formattedImm = '{0:01x}'.format(parsedImm)
-                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formattedImm + '\n')
+                            formatted_imm = f'{parsed_imm:01x}'
+                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate shifts need an immd then a register' + line)
                 else:
@@ -209,23 +210,25 @@ def assemble(args):
                 if len(parts) == 1:
                     displacement = parts[0]
                     if displacement[0] == '$': # if displacement is imm
-                        parsedDisp = int(displacement[1:]) # cut off first char
-                        if parsedDisp > 255 or -255 > parsedDisp:
+                        parsed_disp = int(displacement[1:]) # cut off first char
+                        if parsed_disp > 255 or -255 > parsed_disp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif parsedDisp >= 0: 
-                            formattedDisp = '{0:02x}'.format(parsedDisp)
+                        elif parsed_disp >= 0: 
+                            formatted_disp = f'{parsed_disp:02x}'
                         else:
-                            formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
-                        wf.write('c' + inst_codes[instr[1:]] + formattedDisp + '\n')
+                            twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
+                            formatted_disp = f'{twos_comp_disp:02x}'
+                        wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
                     elif displacement[0] == '.': # if displacement is label
-                        parsedDisp = labels[displacement] - address
-                        if parsedDisp > 255 or -255 > parsedDisp:
+                        parsed_disp = labels[displacement] - address
+                        if parsed_disp > 255 or -255 > parsed_disp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif parsedDisp >= 0: 
-                            formattedDisp = '{0:02x}'.format(parsedDisp)
+                        elif parsed_disp >= 0: 
+                            formatted_disp = '{parsed_disp:02x}'
                         else:
-                            formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
-                        wf.write('c' + inst_codes[instr[1:]] + formattedDisp + '\n')
+                            twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
+                            formatted_disp = f'{twos_comp_disp:02x}'
+                        wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
                     else:
                         sys.exit('Syntax Error: Branch operations need a displacement or label')
                 else:
@@ -243,13 +246,13 @@ def assemble(args):
                 if len(parts) == 2:
                     imm, r_dst = parts
                     if imm[0] == '$' and r_dst in reg_codes:
-                        parsedImm = int(imm[1:])
-                        if parsedImm < 0:
+                        parsed_imm = int(imm[1:])
+                        if parsed_imm < 0:
                             print('issue with ', line)
-                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(parsedImm))
+                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(parsed_imm))
                         else: 
-                            formattedImm = '{0:02x}'.format(parsedImm)
-                        wf.write('f' + reg_codes[r_dst] + formattedImm + '\n')
+                            formatted_imm = f'{parsed_imm:02x}'
+                        wf.write('f' + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
@@ -258,13 +261,13 @@ def assemble(args):
                 if len(parts) == 2:
                     imm, r_dst = parts
                     if imm[0] == '$' and r_dst in reg_codes:
-                        parsedImm = int(imm[1:])
-                        if parsedImm < 0:
+                        parsed_imm = int(imm[1:])
+                        if parsed_imm < 0:
                             print('issue with ', line)
-                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(parsedImm))
+                            sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(parsed_imm))
                         else: 
-                            formattedImm = '{0:02x}'.format(parsedImm)
-                        wf.write('d' + reg_codes[r_dst] + formattedImm + '\n')
+                            formatted_imm = f'{parsed_imm:02x}'
+                        wf.write('d' + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
