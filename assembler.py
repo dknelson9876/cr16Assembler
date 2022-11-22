@@ -5,6 +5,8 @@ labels = {}
 jpoint_instrs = {}
 r_type_insts = {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts = {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI'}
+sign_ext_imm = {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
+zero_ext_imm = {'ANDI', 'ORI', 'XORI', 'MOVI'}
 sh_type_insts = {'LSH', 'ALSH'}
 shi_type_insts = {'LSHI', 'ALSHI'}
 b_type_insts = {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
@@ -65,6 +67,7 @@ inst_codes : dict[str,str] = {
     'CMP':   'B',
     'CMPI':  'B',
 
+    'SHIFT_TYPE': '8',
     'LSH':   '4',
     'LSHI':  '0',
     'ASHU':  '4',
@@ -215,7 +218,7 @@ def assemble(args):
                     if r_src not in reg_codes or r_dst not in reg_codes:
                         sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
                     else:
-                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
+                        wf.write(inst_codes['SHIFT_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
             elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) != 2:
                     sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
@@ -259,31 +262,33 @@ def assemble(args):
                         twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
                         formatted_disp = f'{twos_comp_disp:02X}'
                     wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
-            # TODO: continue rewriting error messages here
             elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 1:
-                    r_src = parts[0]
-                    if r_src in reg_codes:
-                        wf.write('4' + inst_codes[instr[1:]] + 'c' + reg_codes[r_src] + '\n')
-                    else:
-                        sys.exit('Syntax Error: Jump operations need a register')
+                if len(parts) != 1:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
                 else:
-                    sys.exit('Syntax Error: Jump operations need one arg')
+                    r_src = parts[0]
+                    if r_src not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
+                        wf.write('4' + inst_codes[instr[1:]] + 'c' + reg_codes[r_src] + '\n')
             elif instr == 'LUI': # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
                     imm, r_dst = parts
-                    if imm[0] == '$' and r_dst in reg_codes:
+                    if imm[0] != '$':
+                        sys.exit(f'ERROR: Badly formatted imm on line {i} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found \'{imm[0]}\'')
+                    if r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
                         parsed_imm = int(imm[1:])
                         if parsed_imm < 0:
                             print('issue with ', line)
                             sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(parsed_imm))
-                        else: 
-                            formatted_imm = f'{parsed_imm:02X}'
+                        formatted_imm = f'{parsed_imm:02X}'
                         wf.write('f' + reg_codes[r_dst] + formatted_imm + '\n')
-                    else:
-                        sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
-                else:
-                    sys.exit('Syntax Error: Immediate operations need two args: ' + line)
+            # TODO: continue with error messages here
             elif instr == 'MOVI': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
                     imm, r_dst = parts
