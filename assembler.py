@@ -11,6 +11,7 @@ sh_type_insts = {'LSH', 'ALSH'}
 shi_type_insts = {'LSHI', 'ALSHI'}
 b_type_insts = {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
 j_type_insts = {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
+spec_type_insts = {'LOAD', 'STOR', 'JAL'}
 
 reg_codes : dict[str,str] = {
     '%r0': '0',
@@ -73,6 +74,7 @@ inst_codes : dict[str,str] = {
     'ASHU':  '4',
     'ASHUI': '2',
 
+    'SPECIAL_TYPE': '4',
     'LUI':  'F',
     'LOAD': '0',
     'LPR':  '1',
@@ -200,7 +202,7 @@ def assemble(args):
                     if r_dst not in reg_codes:
                         sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
                     else:
-                        parsed_imm = int(imm.replace('$', ''))
+                        parsed_imm = int(imm[1:])
                         if parsed_imm > 127 or -128 > parsed_imm:
                             sys.exit(f'ERROR: Out of range imm on line {i} in instruction {x}'
                                 +f'\n\tImmediate can not be larger then 127 or less then -128, found {parsed_imm}')
@@ -304,33 +306,14 @@ def assemble(args):
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-            elif instr == 'LOAD': # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    r_dst, r_addr = parts
-                    if r_dst in reg_codes and r_addr in reg_codes:
-                        wf.write('4' + reg_codes[r_dst] + '0' + reg_codes[r_addr] + '\n')
-                    else:
-                        sys.exit('Syntax Error: load needs two registers')
+            elif instr in spec_type_insts:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                r_first, r_sec = parts
+                if r_first not in reg_codes or r_sec not in reg_codes:
+                    sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
                 else:
-                    sys.exit('Syntax Error: load needs two args')
-            elif instr == 'STOR': # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    r_src, r_addr = parts
-                    if r_src in reg_codes and r_addr in reg_codes:
-                        wf.write('4' + reg_codes[r_src] + '4' + reg_codes[r_addr] + '\n')
-                    else:
-                        sys.exit('Syntax Error: store needs two registers')
-                else:
-                    sys.exit('Syntax Error: store needs two args')
-            elif instr == 'JAL': # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    r_link, r_target = parts
-                    if r_link in reg_codes and r_target in reg_codes:
-                        wf.write('4' + reg_codes[r_link] + '8' + reg_codes[r_target] + '\n')
-                    else:
-                        sys.exit('Syntax Error: JAL needs two registers')
-                else:
-                    sys.exit('Syntax Error: JAL needs two args')
+                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec])
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
