@@ -3,10 +3,10 @@ import argparse
 
 labels = {}
 jpoint_instrs = {}
-r_type_insts = {'ADD', 'ADDU', 'ADDC', 'ADDCU', 'SUB','SUBC', 'CMP', 'CMPU', 'AND', 'OR', 'XOR', 'MUL'}
-i_type_insts = {'ADDI', 'ADDUI', 'ADDCI', 'SUBI', 'SUBCI','CMPI', 'CMPUI', 'ANDI', 'ORI', 'XORI','MULI'}
-sh_type_insts = {'LSH', 'RSH', 'ALSH', 'ARSH'}
-shi_type_insts = {'LSHI', 'RSHI', 'ALSHI', 'ARSHI'}
+r_type_insts = {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
+i_type_insts = {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI'}
+sh_type_insts = {'LSH', 'ALSH'}
+shi_type_insts = {'LSHI', 'ALSHI'}
 b_type_insts = {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
 j_type_insts = {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
 
@@ -21,48 +21,68 @@ reg_codes : dict[str,str] = {
     '%r7': '7',
     '%r8': '8',
     '%r9': '9',
-    '%r10': 'a',
-    '%r11': 'b',
-    '%r12': 'c',
-    '%r13': 'd',
-    '%r14': 'e',
-    '%r15': 'f'
+    '%r10': 'A',
+    '%r11': 'B',
+    '%r12': 'C',
+    '%r13': 'D',
+    '%r14': 'E',
+    '%r15': 'F',
+    '%rA': 'A',
+    '%rB': 'B',
+    '%rC': 'C',
+    '%rD': 'D',
+    '%rE': 'E',
+    '%rF': 'F',
+    '%ra': 'A',
+    '%rb': 'B',
+    '%rc': 'C',
+    '%rd': 'D',
+    '%re': 'E',
+    '%rf': 'F'
 }
 
 inst_codes : dict[str,str] = {
-    'ADD': '5',
-    'ADDU': '6',
-    'ADDC': '7',
-    'ADDCU': '4',
-    'SUB': '9',
-    'SUBC': 'a',
-    'CMP': 'b',
-    'CMPU': '8',
+    'AND':   '1',
+    'ANDI':  '1',
+    'OR':    '2',
+    'ORI':   '2',
+    'XOR':   '3',
+    'XORI':  '3',
 
-    'ADDI': '5',
+    'ADD':   '5',
+    'ADDI':  '5',
+    'ADDU':  '6',
     'ADDUI': '6',
+    'ADDC':  '7',
     'ADDCI': '7',
-    'SUBI': '9',
-    'SUBCI': 'a',
-    'CMPI': 'b',
-    'CMPUI': 'c',
+    'MUL':   'E',
+    'MULI':  'E',
+    'SUB':   '9',
+    'SUBI':  '9',
+    'SUBC':  'A',
+    'SUBCI': 'A',
+    'CMP':   'B',
+    'CMPI':  'B',
 
-    'AND': '1',
-    'OR': '2',
-    'XOR': '3',
+    'LSH':   '4',
+    'LSHI':  '0',
+    'ASHU':  '4',
+    'ASHUI': '2',
 
-    'ANDI': '1',
-    'ORI': '2',
-    'XORI': '3',
-
-    'LSH': '4',
-    'LSHI': '0',
-    'RSH': '5',
-    'RSHI': '3',
-    'ALSH': '4',
-    'ALSHI': '8',
-    'ARSH': '7',
-    'ARSHI': 'b',
+    'LUI':  'F',
+    'LOAD': '0',
+    'LPR':  '1',
+    'SNXB': '2',
+    'DI':   '3',
+    'STOR': '4',
+    'SPR':  '5',
+    'ZRXB': '6',
+    'EI':   '7',
+    'JAL':  '8',
+    'RETX': '9',
+    'TBIT': 'A',
+    'EXCP': 'B',
+    'TBITI':'E',
 
     'EQ' : '0',
     'NE' : '1',
@@ -74,11 +94,11 @@ inst_codes : dict[str,str] = {
     'LE' : '7',
     'FS' : '8',
     'FC' : '9',
-    'LO' : 'a',
-    'HS' : 'b',
-    'LT' : 'c',
-    'GE' : 'd',
-    'UC' : 'e'
+    'LO' : 'A',
+    'HS' : 'B',
+    'LT' : 'C',
+    'GE' : 'D',
+    'UC' : 'E'
 }
 
 def replaceLabel(label):
@@ -174,10 +194,10 @@ def assemble(args):
                             print('issue with ', line)
                             sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsed_imm))
                         elif parsed_imm >= 0: 
-                            formatted_imm = f'{parsed_imm:02x}'
+                            formatted_imm = f'{parsed_imm:02X}'
                         else:
                             twos_comp_imm = ((-1 * parsed_imm) ^ 255) + 1
-                            formatted_imm = f'{twos_comp_imm:02x}'
+                            formatted_imm = f'{twos_comp_imm:02X}'
                         wf.write(inst_codes[instr] + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
@@ -200,7 +220,7 @@ def assemble(args):
                         if parsed_imm > 15 or 0 > parsed_imm:
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
-                            formatted_imm = f'{parsed_imm:01x}'
+                            formatted_imm = f'{parsed_imm:01X}'
                         wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate shifts need an immd then a register' + line)
@@ -214,20 +234,20 @@ def assemble(args):
                         if parsed_disp > 255 or -255 > parsed_disp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
                         elif parsed_disp >= 0: 
-                            formatted_disp = f'{parsed_disp:02x}'
+                            formatted_disp = f'{parsed_disp:02X}'
                         else:
                             twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
-                            formatted_disp = f'{twos_comp_disp:02x}'
+                            formatted_disp = f'{twos_comp_disp:02X}'
                         wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
                     elif displacement[0] == '.': # if displacement is label
                         parsed_disp = labels[displacement] - address
                         if parsed_disp > 255 or -255 > parsed_disp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
                         elif parsed_disp >= 0: 
-                            formatted_disp = '{parsed_disp:02x}'
+                            formatted_disp = f'{parsed_disp:02X}'
                         else:
                             twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
-                            formatted_disp = f'{twos_comp_disp:02x}'
+                            formatted_disp = f'{twos_comp_disp:02X}'
                         wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
                     else:
                         sys.exit('Syntax Error: Branch operations need a displacement or label')
@@ -251,7 +271,7 @@ def assemble(args):
                             print('issue with ', line)
                             sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with LUI yet: ' + str(parsed_imm))
                         else: 
-                            formatted_imm = f'{parsed_imm:02x}'
+                            formatted_imm = f'{parsed_imm:02X}'
                         wf.write('f' + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
@@ -266,7 +286,7 @@ def assemble(args):
                             print('issue with ', line)
                             sys.exit('NotImplemented: I haven\'t bothered to do negative immediates with MOVI yet: ' + str(parsed_imm))
                         else: 
-                            formatted_imm = f'{parsed_imm:02x}'
+                            formatted_imm = f'{parsed_imm:02X}'
                         wf.write('d' + reg_codes[r_dst] + formatted_imm + '\n')
                     else:
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
