@@ -157,8 +157,7 @@ def assemble(args):
             instr = parts.pop(0)
             if instr in r_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_src = parts.pop(0)
-                    r_dst = parts.pop(0)
+                    r_src, r_dst = parts
                     # i.e. ADD %r1 %r2 -> 0251
                     if r_src in reg_codes and r_dst in reg_codes:
                         wf.write('0' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
@@ -168,8 +167,7 @@ def assemble(args):
                     sys.exit('Syntax Error: R-type needs two args')
             elif instr in i_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    displacement = parts.pop(0)
-                    r_dst = parts.pop(0)
+                    displacement, r_dst = parts
                     if displacement[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(displacement.replace('$', ''))
                         if parsedImm > 127 or -128 > parsedImm:
@@ -186,8 +184,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
             elif instr in sh_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_src = parts.pop(0)
-                    r_dst = parts.pop(0)
+                    r_src, r_dst = parts
                     if r_src in reg_codes and r_dst in reg_codes:
                         wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
                     else:
@@ -196,10 +193,9 @@ def assemble(args):
                     sys.exit('Syntax Error: shifts needs two args')
             elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    displacement = parts.pop(0)
-                    r_dst = parts.pop(0)
-                    if displacement[0] == '$' and r_dst in reg_codes:
-                        parsedImm = int(displacement.replace('$', ''))
+                    imm, r_dst = parts
+                    if imm[0] == '$' and r_dst in reg_codes:
+                        parsedImm = int(imm[1:])
                         if parsedImm > 15 or 0 > parsedImm:
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
@@ -211,7 +207,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Immediate shifts need two args')
             elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 1:
-                    displacement = parts.pop(0)
+                    displacement = parts[0]
                     if displacement[0] == '$': # if displacement is imm
                         parsedDisp = int(displacement[1:]) # cut off first char
                         if parsedDisp > 255 or -255 > parsedDisp:
@@ -236,7 +232,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Branch operations need one arg')
             elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 1:
-                    r_src = parts.pop(0)
+                    r_src = parts[0]
                     if r_src in reg_codes:
                         wf.write('4' + inst_codes[instr[1:]] + 'c' + reg_codes[r_src] + '\n')
                     else:
@@ -245,8 +241,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Jump operations need one arg')
             elif instr == 'LUI': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    imm = parts.pop(0)
-                    r_dst = parts.pop(0)
+                    imm, r_dst = parts
                     if imm[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(imm[1:])
                         if parsedImm < 0:
@@ -261,8 +256,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
             elif instr == 'MOVI': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    imm = parts.pop(0)
-                    r_dst = parts.pop(0)
+                    imm, r_dst = parts
                     if imm[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(imm[1:])
                         if parsedImm < 0:
@@ -277,8 +271,7 @@ def assemble(args):
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
             elif instr == 'LOAD': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_dst = parts.pop(0)
-                    r_addr = parts.pop(0)
+                    r_dst, r_addr = parts
                     if r_dst in reg_codes and r_addr in reg_codes:
                         wf.write('4' + reg_codes[r_dst] + '0' + reg_codes[r_addr] + '\n')
                     else:
@@ -287,8 +280,7 @@ def assemble(args):
                     sys.exit('Syntax Error: load needs two args')
             elif instr == 'STOR': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_src = parts.pop(0)
-                    r_addr = parts.pop(0)
+                    r_src, r_addr = parts
                     if r_src in reg_codes and r_addr in reg_codes:
                         wf.write('4' + reg_codes[r_src] + '4' + reg_codes[r_addr] + '\n')
                     else:
@@ -297,8 +289,7 @@ def assemble(args):
                     sys.exit('Syntax Error: store needs two args')
             elif instr == 'JAL': # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
-                    r_link = parts.pop(0)
-                    r_target = parts.pop(0)
+                    r_link, r_target = parts
                     if r_link in reg_codes and r_target in reg_codes:
                         wf.write('4' + reg_codes[r_link] + '8' + reg_codes[r_target] + '\n')
                     else:
