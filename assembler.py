@@ -42,6 +42,7 @@ reg_codes : dict[str,str] = {
 }
 
 inst_codes : dict[str,str] = {
+    'REGISTER_TYPE': '0',
     'AND':   '1',
     'ANDI':  '1',
     'OR':    '2',
@@ -166,7 +167,7 @@ def assemble(args):
     sf = open('stripped.mc', 'w')
 
     address = -1
-    for x in f:
+    for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
         parts = replaceLabel(line).split()
         if len(parts) > 0 and line[0] != '.':
@@ -176,83 +177,89 @@ def assemble(args):
             address = address + 1
             instr = parts.pop(0)
             if instr in r_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    # i.e. ADD %r1 %r2 -> 0251
-                    r_src, r_dst = parts
-                    if r_src in reg_codes and r_dst in reg_codes:
-                        wf.write('0' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
-                    else:
-                        sys.exit('Syntax Error: R-type needs two registers')
+                # i.e. ADD %r1 %r2 -> 0251
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
                 else:
-                    sys.exit('Syntax Error: R-type needs two args')
+                    r_src, r_dst = parts
+                    if r_src not in reg_codes or r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
+                        wf.write(inst_codes['REGISTER_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
             elif instr in i_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    displacement, r_dst = parts
-                    if displacement[0] == '$' and r_dst in reg_codes:
-                        parsed_imm = int(displacement.replace('$', ''))
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
+                    imm, r_dst = parts
+                    if imm[0] != '$':
+                        sys.exit(f'ERROR: Badly formatted imm on line {i} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
+                    if r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
+                        parsed_imm = int(imm.replace('$', ''))
                         if parsed_imm > 127 or -128 > parsed_imm:
-                            print('issue with ', line)
-                            sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsed_imm))
+                            sys.exit(f'ERROR: Out of range imm on line {i} in instruction {x}'
+                                +f'\n\tImmediate can not be larger then 127 or less then -128, found {parsed_imm}')
                         elif parsed_imm >= 0: 
                             formatted_imm = f'{parsed_imm:02X}'
                         else:
                             twos_comp_imm = ((-1 * parsed_imm) ^ 255) + 1
                             formatted_imm = f'{twos_comp_imm:02X}'
                         wf.write(inst_codes[instr] + reg_codes[r_dst] + formatted_imm + '\n')
-                    else:
-                        sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
-                else:
-                    sys.exit('Syntax Error: Immediate operations need two args: ' + line)
             elif instr in sh_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
-                    r_src, r_dst = parts
-                    if r_src in reg_codes and r_dst in reg_codes:
-                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
-                    else:
-                        sys.exit('Syntax Error: shifts needs two self.REGISTERS')
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
                 else:
-                    sys.exit('Syntax Error: shifts needs two args')
+                    r_src, r_dst = parts
+                    if r_src not in reg_codes or r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
+                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
             elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 2:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
                     imm, r_dst = parts
-                    if imm[0] == '$' and r_dst in reg_codes:
+                    if imm[0] != '$':
+                        sys.exit(f'ERROR: Badly formatted imm on line {i} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found \'{imm[0]}\'')
+                    if r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i} in instruction {x}')
+                    else:
                         parsed_imm = int(imm[1:])
                         if parsed_imm > 15 or 0 > parsed_imm:
-                            sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
+                            sys.exit(f'ERROR: Out of range imm on line {i} in inst {x}'
+                                    +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
                         else:  
                             formatted_imm = f'{parsed_imm:01X}'
-                        wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
-                    else:
-                        sys.exit('Syntax Error: Immediate shifts need an immd then a register' + line)
-                else:
-                    sys.exit('Syntax Error: Immediate shifts need two args')
+                            wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
             elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
-                if len(parts) == 1:
+                if len(parts) != 1:
+                    sys.exit(f'ERROR: Wrong number of args on line {i} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
+                else:
                     displacement = parts[0]
                     if displacement[0] == '$': # if displacement is imm
                         parsed_disp = int(displacement[1:]) # cut off first char
                         if parsed_disp > 255 or -255 > parsed_disp:
-                            sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif parsed_disp >= 0: 
-                            formatted_disp = f'{parsed_disp:02X}'
-                        else:
-                            twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
-                            formatted_disp = f'{twos_comp_disp:02X}'
-                        wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
+                            sys.exit(f'ERROR: Out of range displacement on line {i} in inst {x}'
+                                    +f'\n\t Displacement must be between -255 and 255, found: {parsed_disp}')
                     elif displacement[0] == '.': # if displacement is label
                         parsed_disp = labels[displacement] - address
                         if parsed_disp > 255 or -255 > parsed_disp:
-                            sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif parsed_disp >= 0: 
-                            formatted_disp = f'{parsed_disp:02X}'
-                        else:
-                            twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
-                            formatted_disp = f'{twos_comp_disp:02X}'
-                        wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
+                            sys.exit(f'ERROR: Out of range displacement on line {i} in inst {x}'
+                                    +f'\n\t Displacement must be between -255 and 255, but label created displacement: {parsed_disp}')
                     else:
-                        sys.exit('Syntax Error: Branch operations need a displacement or label')
-                else:
-                    sys.exit('Syntax Error: Branch operations need one arg')
+                        sys.exit(f'ERROR: Bad branch displacement on line {i} in inst {x}'
+                                +f'\n\tCould not recognize {displacement} as a valid imm or label')
+
+                    if parsed_disp >= 0: 
+                        formatted_disp = f'{parsed_disp:02X}'
+                    else:
+                        twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
+                        formatted_disp = f'{twos_comp_disp:02X}'
+                    wf.write('c' + inst_codes[instr[1:]] + formatted_disp + '\n')
+            # TODO: continue rewriting error messages here
             elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 1:
                     r_src = parts[0]
