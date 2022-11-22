@@ -105,11 +105,11 @@ def assemble(args):
         line = x.split('#')[0] # discard comment at end of line
         parts = line.split()
         
-        if (len(parts) > 0):
-            if (line[0] == '.'):
+        if len(parts) > 0:
+            if line[0] == '.':
                 labelAddress = address + 1
 
-                if (labelAddress % 2 == 0):
+                if labelAddress % 2 == 0:
                     odd = False
                 else:
                     odd = True
@@ -155,7 +155,7 @@ def assemble(args):
             sf.write('\n')
             address = address + 1
             instr = parts.pop(0)
-            if (instr in r_type_insts): # ----------------------------------------------------------------------------------------
+            if instr in r_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) == 2:
                     r_src = parts.pop(0)
                     r_dst = parts.pop(0)
@@ -166,8 +166,8 @@ def assemble(args):
                         sys.exit('Syntax Error: R-type needs two registers')
                 else:
                     sys.exit('Syntax Error: R-type needs two args')
-            elif (instr in i_type_insts): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr in i_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     displacement = parts.pop(0)
                     r_dst = parts.pop(0)
                     if displacement[0] == '$' and r_dst in reg_codes:
@@ -175,7 +175,7 @@ def assemble(args):
                         if parsedImm > 127 or -128 > parsedImm:
                             print('issue with ', line)
                             sys.exit('Syntax Error: Immediate can not be larger then 127 or less then -128, got ' + str(parsedImm))
-                        elif (parsedImm >= 0): 
+                        elif parsedImm >= 0: 
                             formattedImm = '{0:02x}'.format(parsedImm)
                         else:
                             formattedImm = '{0:02x}'.format(((-1 * parsedImm) ^ 255) + 1)
@@ -184,23 +184,23 @@ def assemble(args):
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-            elif (instr in sh_type_insts): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr in sh_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     r_src = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((r_src in reg_codes) and (r_dst in reg_codes)):
+                    if r_src in reg_codes and r_dst in reg_codes:
                         wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
                     else:
                         sys.exit('Syntax Error: shifts needs two self.REGISTERS')
                 else:
                     sys.exit('Syntax Error: shifts needs two args')
-            elif (instr in shi_type_insts): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     displacement = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((displacement[0] in '$') and (r_dst in reg_codes)):
+                    if displacement[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(displacement.replace('$', ''))
-                        if ((parsedImm > 15) or (0 > parsedImm)):
+                        if parsedImm > 15 or 0 > parsedImm:
                             sys.exit('Syntax Error: Immediate can not be larger then 15 or less then 0')
                         else:  
                             formattedImm = '{0:01x}'.format(parsedImm)
@@ -209,23 +209,23 @@ def assemble(args):
                         sys.exit('Syntax Error: Immediate shifts need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate shifts need two args')
-            elif (instr in b_type_insts): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 1):
+            elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) == 1:
                     displacement = parts.pop(0)
-                    if (displacement[0] == '$'): # if displacement is imm
+                    if displacement[0] == '$': # if displacement is imm
                         parsedDisp = int(displacement[1:]) # cut off first char
-                        if ((parsedDisp > 255) or (-255 > parsedDisp)):
+                        if parsedDisp > 255 or -255 > parsedDisp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif (parsedDisp >= 0): 
+                        elif parsedDisp >= 0: 
                             formattedDisp = '{0:02x}'.format(parsedDisp)
                         else:
                             formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
                         wf.write('c' + inst_codes[instr[1:]] + formattedDisp + '\n')
-                    elif (displacement[0] == '.'): # if displacement is label
+                    elif displacement[0] == '.': # if displacement is label
                         parsedDisp = labels[displacement] - address
-                        if ((parsedDisp > 255) or (-255 > parsedDisp)):
+                        if parsedDisp > 255 or -255 > parsedDisp:
                             sys.exit('Syntax Error: Branch can not be larger then 255 or less then -255')
-                        elif (parsedDisp >= 0): 
+                        elif parsedDisp >= 0: 
                             formattedDisp = '{0:02x}'.format(parsedDisp)
                         else:
                             formattedDisp = '{0:02x}'.format(((-1 * parsedDisp) ^ 255) + 1)
@@ -234,20 +234,20 @@ def assemble(args):
                         sys.exit('Syntax Error: Branch operations need a displacement or label')
                 else:
                     sys.exit('Syntax Error: Branch operations need one arg')
-            elif (instr in j_type_insts): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 1):
+            elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) == 1:
                     r_src = parts.pop(0)
-                    if ((r_src in reg_codes)):
-                        wf.write('4' + inst_codes[instr.replace('J', '')] + 'c' + reg_codes[r_src] + '\n')
+                    if r_src in reg_codes:
+                        wf.write('4' + inst_codes[instr[1:]] + 'c' + reg_codes[r_src] + '\n')
                     else:
                         sys.exit('Syntax Error: Jump operations need a register')
                 else:
                     sys.exit('Syntax Error: Jump operations need one arg')
-            elif (instr == 'LUI'): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr == 'LUI': # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     imm = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((imm[0] == '$') and (r_dst in reg_codes)):
+                    if imm[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(imm[1:])
                         if parsedImm < 0:
                             print('issue with ', line)
@@ -259,11 +259,11 @@ def assemble(args):
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-            elif (instr == 'MOVI'): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr == 'MOVI': # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     imm = parts.pop(0)
                     r_dst = parts.pop(0)
-                    if ((imm[0] == '$') and (r_dst in reg_codes)):
+                    if imm[0] == '$' and r_dst in reg_codes:
                         parsedImm = int(imm[1:])
                         if parsedImm < 0:
                             print('issue with ', line)
@@ -275,33 +275,32 @@ def assemble(args):
                         sys.exit('Syntax Error: Immediate operations need an immd then a register' + line)
                 else:
                     sys.exit('Syntax Error: Immediate operations need two args: ' + line)
-            elif (instr == 'LOAD'): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr == 'LOAD': # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     r_dst = parts.pop(0)
                     r_addr = parts.pop(0)
-                    if ((r_dst in reg_codes) and (r_addr in reg_codes)):
+                    if r_dst in reg_codes and r_addr in reg_codes:
                         wf.write('4' + reg_codes[r_dst] + '0' + reg_codes[r_addr] + '\n')
                     else:
                         sys.exit('Syntax Error: load needs two registers')
                 else:
                     sys.exit('Syntax Error: load needs two args')
-            elif (instr == 'STOR'): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr == 'STOR': # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     r_src = parts.pop(0)
                     r_addr = parts.pop(0)
-                    if ((r_src in reg_codes) and (r_addr in reg_codes)):
+                    if r_src in reg_codes and r_addr in reg_codes:
                         wf.write('4' + reg_codes[r_src] + '4' + reg_codes[r_addr] + '\n')
                     else:
                         sys.exit('Syntax Error: store needs two registers')
                 else:
                     sys.exit('Syntax Error: store needs two args')
-            elif (instr == 'JAL'): # ----------------------------------------------------------------------------------------
-                if (len(parts) == 2):
+            elif instr == 'JAL': # ----------------------------------------------------------------------------------------
+                if len(parts) == 2:
                     r_link = parts.pop(0)
                     r_target = parts.pop(0)
-                    if ((r_link in reg_codes) and (r_target in reg_codes)):
-                        data = '4' + reg_codes[r_link] + '8' + reg_codes[r_target]
-                        wf.write(data + '\n')
+                    if r_link in reg_codes and r_target in reg_codes:
+                        wf.write('4' + reg_codes[r_link] + '8' + reg_codes[r_target] + '\n')
                     else:
                         sys.exit('Syntax Error: JAL needs two registers')
                 else:
