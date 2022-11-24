@@ -296,7 +296,7 @@ def assemble(args):
                 if r_first not in reg_codes or r_sec not in reg_codes:
                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                 else:
-                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec])
+                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
