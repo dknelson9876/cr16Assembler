@@ -204,13 +204,15 @@ def assemble(args):
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
                 else:
                     imm, r_dst = parts
-                    if imm[0] != '$':
-                        sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
-                                +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
                     if r_dst not in reg_codes:
                         sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-
-                    parsed_imm = int(imm[1:])
+                    if imm[0] == '$':
+                        parsed_imm = int(imm[1:])
+                    elif imm[0] == '.':
+                        parsed_imm = labels[imm] - address
+                    else:
+                        sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
 
                     if parsed_imm > 0xFF or parsed_imm < -128:
                         sys.exit(f'ERROR: Out of range imm on line {i+1} in instruction {x}'
