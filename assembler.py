@@ -3,6 +3,7 @@ import argparse
 
 labels = {}
 jpoint_instrs = {}
+macros : dict[str,str] = {}
 
 r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
@@ -127,8 +128,21 @@ def replaceLabel(label):
         return label
     else:
         m = map(r, label.split())
-        print(f'resolved {label} to {" ".join(m)}')
         return ' '.join(m)
+
+def replaceMacros(parts: list[str]):
+    toreturn: list[str] = []
+    if len(parts) > 0 and parts[0] == '`define': return []
+    for s in parts:
+        if s[0] == '`':
+            if s[1:] in macros:
+                toreturn.append(macros[s[1:]])
+            else:
+                sys.exit(f"Undefined macro: {s}")
+        else:
+            toreturn.append(s)
+    return toreturn
+
     
 def assemble(args):
     # find the labels and their addresses
@@ -172,9 +186,22 @@ def assemble(args):
             else:
                 address = address + 1
 
+    f.seek(0)
+
+    # Find all macro definitions
+    for x in f:
+        line = x.split('#')[0]
+        parts = line.split()
+
+        if len(parts) > 0 and parts[0]=='`define':
+            macros[parts[1]] = parts[2]
+
+
+
     f.close()
 
     print(f"Labels found: {labels}")
+    print(f'Macros found: {macros}')
 
     f = open(args.file, 'r')
     out_name = str(args.file.rsplit('.', 1)[0] + '.dat')
@@ -184,8 +211,8 @@ def assemble(args):
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
-        parts = line.split()
-        if len(parts) > 0 and line[0] != '.':
+        parts = replaceMacros(line.split())
+        if len(parts) > 0 and line[0] != '.' and line[0] != '`':
             for part in parts:
                 sf.write(part + ' ')
             sf.write('\n')
