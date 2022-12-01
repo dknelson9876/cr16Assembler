@@ -48,6 +48,7 @@ reg_codes : dict[str,str] = {
 
 inst_codes : dict[str,str] = {
     'REGISTER_TYPE': '0',
+    'WAIT':  '0',
     'AND':   '1',
     'ANDI':  '1',
     'OR':    '2',
@@ -126,6 +127,7 @@ def replaceLabel(label):
         return label
     else:
         m = map(r, label.split())
+        print(f'resolved {label} to {" ".join(m)}')
         return ' '.join(m)
     
 def assemble(args):
@@ -182,14 +184,16 @@ def assemble(args):
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
-        parts = replaceLabel(line).split()
+        parts = line.split()
         if len(parts) > 0 and line[0] != '.':
             for part in parts:
                 sf.write(part + ' ')
             sf.write('\n')
             address = address + 1
             instr = parts.pop(0)
-            if instr in r_type_insts: # ----------------------------------------------------------------------------------------
+            if instr == 'WAIT':
+                wf.write('0000\n')
+            elif instr in r_type_insts: # ----------------------------------------------------------------------------------------
                 # i.e. ADD %r1 %r2 -> 0251
                 if len(parts) != 2:
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
@@ -304,7 +308,7 @@ def assemble(args):
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
 
     # while(address < 1023):
-    #     wf.write('0000000000000000\n')
+    #     wf.write('0000\n')
     #     address = address + 1
     wf.close()
     f.close()
