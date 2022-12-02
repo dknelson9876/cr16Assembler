@@ -16,6 +16,9 @@ spec_type_insts= {'LOAD', 'STOR', 'JAL'}
 sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
 zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 
+# Used by CALL expansion
+parameter_regs = ['%r8', '%r9', '%rB', '%rC', '%rD']
+
 reg_codes : dict[str,str] = {
     '%r0': '0',
     '%r1': '1',
@@ -143,10 +146,44 @@ def replaceMacros(parts: list[str]):
             toreturn.append(s)
     return toreturn
 
+def precompile(args):
+    f = open(args.file, 'r')
+    df = open('defined.mc', 'w')
+
+    # Find all macro definitions
+    for x in f:
+        line = x.split('#')[0]
+        parts = line.split()
+
+        if len(parts) > 0 and parts[0]=='`define':
+            macros[parts[1]] = parts[2]
     
+    print(f'Macros found: {macros}')
+
+    f.seek(0)
+
+    for line in f:
+        parts = replaceMacros(line.split())
+        if len(parts) > 0 and parts[0] == 'CALL':
+            if len(parts) < 2:
+                sys.exit('not enough CALL args')
+            label = parts[1]
+            reglist = parts[2][1:-1].split(',')
+            if len(reglist) > 5:
+                sys.exit('too many parameters')
+            for i, reg in enumerate(reglist):
+                df.write(f'MOV {reg} {parameter_regs[i]}\n')
+            df.write(f'MOVI {label} %rA\n')
+            df.write(f'JAL %rA %rA\n')
+        else:
+            df.write(' '.join(parts) + '\n')
+
+    f.close()
+    df.close()
+
 def assemble(args):
     # find the labels and their addresses
-    f = open(args.file, 'r')
+    f = open('defined.mc', 'r')
 
     address = -1
 
@@ -186,24 +223,11 @@ def assemble(args):
             else:
                 address = address + 1
 
-    f.seek(0)
-
-    # Find all macro definitions
-    for x in f:
-        line = x.split('#')[0]
-        parts = line.split()
-
-        if len(parts) > 0 and parts[0]=='`define':
-            macros[parts[1]] = parts[2]
-
-
-
     f.close()
 
     print(f"Labels found: {labels}")
-    print(f'Macros found: {macros}')
 
-    f = open(args.file, 'r')
+    f = open('defined.mc', 'r')
     out_name = str(args.file.rsplit('.', 1)[0] + '.dat')
     wf = open(out_name, 'w')
     sf = open('stripped.mc', 'w')
@@ -211,7 +235,7 @@ def assemble(args):
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
-        parts = replaceMacros(line.split())
+        parts = line.split()
         if len(parts) > 0 and line[0] != '.' and line[0] != '`':
             for part in parts:
                 sf.write(part + ' ')
@@ -240,7 +264,7 @@ def assemble(args):
                     if imm[0] == '$':
                         parsed_imm = int(imm[1:])
                     elif imm[0] == '.':
-                        parsed_imm = labels[imm] - address
+                        parsed_imm = labels[imm]
                     else:
                         sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
                                 +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
@@ -344,6 +368,7 @@ def main():
     parser = argparse.ArgumentParser(description='This is the Assembler')
     parser.add_argument('-f', dest='file')
     args = parser.parse_args()
+    precompile(args)
     assemble(args)
   
 if __name__ == "__main__":
