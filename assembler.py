@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 
@@ -117,6 +118,13 @@ inst_codes : dict[str,str] = {
     'UC' : 'E'
 }
 
+# from https://stackoverflow.com/questions/38834378/path-to-a-directory-as-argparse-argument
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+
 def replaceLabel(label):
     def r(l):
         if (l[0] == '.'):
@@ -144,9 +152,9 @@ def replaceMacros(parts: list[str]):
     return toreturn
 
     
-def assemble(args):
+def assemble(filename: str):
     # find the labels and their addresses
-    f = open(args.file, 'r')
+    f = open(filename, 'r')
 
     address = -1
 
@@ -203,10 +211,10 @@ def assemble(args):
     print(f"Labels found: {labels}")
     print(f'Macros found: {macros}')
 
-    f = open(args.file, 'r')
-    out_name = str(args.file.rsplit('.', 1)[0] + '.dat')
-    wf = open(out_name, 'w')
-    sf = open('stripped.mc', 'w')
+    f = open(filename, 'r')
+    out_name = f"{output_dir}{filename[filename.index('/')+1:filename.index('.')]}.dat"
+    wf = open(f"{out_name}", 'w')
+    sf = open(f'{output_dir}stripped.mc', 'w')
 
     address = -1
     for i, x in enumerate(f):
@@ -341,10 +349,27 @@ def assemble(args):
     f.close()
 
 def main():
-    parser = argparse.ArgumentParser(description='This is the Assembler')
-    parser.add_argument('-f', dest='file')
+    parser = argparse.ArgumentParser(description='This is the CR16 Assembler')
+    parser.add_argument('file', nargs='?', help='The asm file to assemble')
+    parser.add_argument('--dir', type=dir_path, help='A directory of asm files to assemble')
+    parser.add_argument('--dest', type=dir_path, help='A directory to store resulting .dat files')
     args = parser.parse_args()
-    assemble(args)
+    global output_dir
+    if args.dest == None:
+        if args.dir == None:
+            output_dir = '.'
+        else:
+            output_dir = f'{args.dir}/'
+    else:
+        output_dir = f'{args.dest}/'
+
+    if args.file != None:
+        assemble(args.file)
+    elif args.dir != None:
+        for f in os.listdir(args.dir):
+            assemble(f'{args.dir}/{f}')
+    else:
+        sys.exit('argument error: must provide file or directory of files to assemble')
   
 if __name__ == "__main__":
     main()
