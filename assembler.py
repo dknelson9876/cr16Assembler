@@ -239,9 +239,9 @@ def assemble(filename: str):
     print(f"Labels found: {labels}")
 
     f = open('defined.mc', 'r')
-    filename.replace('\\', '/')
-    start = filename.index('/', 0)+1 if '/' in filename else 0
-    out_name = f"{output_dir}{filename[start:filename.index('.')]}.dat"
+    filename = filename.replace('\\', '/')
+    start = filename.rindex('/')+1 if '/' in filename else 0
+    out_name = f"{output_dir}{filename[start:filename.rindex('.')]}.dat"
     wf = open(f"{out_name}", 'w')
     sf = open(f'{output_dir}stripped.mc', 'w')
 
@@ -371,6 +371,9 @@ def assemble(filename: str):
                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                 else:
                     wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
+            elif instr == 'NOP':
+                # Hardcode NOP as OR %r0 %r0
+                wf.write('0020\n')
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
@@ -390,9 +393,10 @@ def assemble(filename: str):
         else:
             sys.exit(f"Unsupported RAM encoding mode: {mode[:-1]}")
 
-    while address < FILE_LENGTH-1:
-        wf.write('0000\n')
-        address = address + 1
+    if not short_file:
+        while address < FILE_LENGTH-1:
+            wf.write('0000\n')
+            address = address + 1
     wf.close()
     f.close()
 
@@ -401,7 +405,11 @@ def main():
     parser.add_argument('file', nargs='?', help='The asm file to assemble')
     parser.add_argument('--dir', type=dir_path, help='A directory of asm files to assemble')
     parser.add_argument('--dest', type=dir_path, help='A directory to store resulting .dat files')
+    parser.add_argument('-s', '--short', action='store_true', help='Do not write 0\'s to size of RAM')
     args = parser.parse_args()
+    global short_file
+    short_file = args.short
+
     global output_dir
     if args.dest == None:
         if args.dir == None:
