@@ -6,6 +6,9 @@ labels = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
 
+RAM_START = 8192
+FILE_LENGTH = 16384
+
 r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 sh_type_insts =  {'LSH', 'ALSH'}
@@ -236,14 +239,20 @@ def assemble(filename: str):
     print(f"Labels found: {labels}")
 
     f = open('defined.mc', 'r')
-    out_name = f"{output_dir}{filename[filename.index('/')+1:filename.index('.')]}.dat"
+    filename.replace('\\', '/')
+    start = filename.index('/', 0)+1 if '/' in filename else 0
+    out_name = f"{output_dir}{filename[start:filename.index('.')]}.dat"
     wf = open(f"{out_name}", 'w')
     sf = open(f'{output_dir}stripped.mc', 'w')
 
+    ram = False
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
         parts = line.split()
+        if len(parts) > 0 and line[0] == '@':
+            ram = True
+            break
         if len(parts) > 0 and line[0] != '.' and line[0] != '`':
             for part in parts:
                 sf.write(part + ' ')
@@ -366,9 +375,24 @@ def assemble(filename: str):
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
 
-    # while(address < 1023):
-    #     wf.write('0000\n')
-    #     address = address + 1
+    if ram:
+        while address < RAM_START-1:
+            wf.write('0000\n')
+            address += 1
+        mode = f.readline()
+        if mode == 'DECIMAL\n':
+            for line in f:
+                if len(line) > 1:
+                    parsed_line = int(line[:-1])
+                    formatted_line = f'{parsed_line:04X}'
+                    wf.write(f'{formatted_line}\n')
+                    address += 1
+        else:
+            sys.exit(f"Unsupported RAM encoding mode: {mode[:-1]}")
+
+    while address < FILE_LENGTH-1:
+        wf.write('0000\n')
+        address = address + 1
     wf.close()
     f.close()
 
@@ -381,7 +405,7 @@ def main():
     global output_dir
     if args.dest == None:
         if args.dir == None:
-            output_dir = '.'
+            output_dir = './'
         else:
             output_dir = f'{args.dir}/'
     else:
