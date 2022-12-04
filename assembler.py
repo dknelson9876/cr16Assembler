@@ -183,7 +183,8 @@ def precompile(filename):
             if len(reglist) > 5:
                 sys.exit('too many parameters')
             for i, reg in enumerate(reglist):
-                df.write(f'MOV {reg} {parameter_regs[i]}\n')
+                if reg != '':
+                    df.write(f'MOV {reg} {parameter_regs[i]}\n')
             df.write(f'MOVI {label} %rA\n')
             df.write(f'JAL %rA %rA\n')
         else:
