@@ -131,6 +131,9 @@ def dir_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
+def byte(number, i):
+    return (number & (0xff << (i * 8))) >> (i * 8)
+
 def replaceLabel(label):
     def r(l):
         if (l[0] == '.'):
@@ -187,6 +190,18 @@ def precompile(filename):
                     df.write(f'MOV {reg} {parameter_regs[i]}\n')
             df.write(f'MOVI {label} %rA\n')
             df.write(f'JAL %rA %rA\n')
+        elif len(parts) > 0 and parts[0] == 'MOVW':
+            if len(parts) < 3:
+                sys.exit('not enough MOVW args')
+            imm = parts[1]
+            rdst = parts[2]
+            parsed_imm = int(imm, 0)
+            if parsed_imm > 0xFFFF:
+                sys.exit(f'MOVW imm too large, must be less than 0xFFFF, found {parsed_imm}')
+            lo_byte = byte(parsed_imm, 0)
+            hi_byte = byte(parsed_imm, 1)
+            df.write(f'MOVI ${lo_byte} {rdst}\n')
+            df.write(f'LUI ${hi_byte} {rdst}\n')
         else:
             df.write(' '.join(parts) + '\n')
 
