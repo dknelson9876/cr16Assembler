@@ -1,9 +1,13 @@
+import os
 import sys
 import argparse
 
 labels = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
+
+RAM_START = 8192
+FILE_LENGTH = 16384
 
 r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
@@ -117,6 +121,13 @@ inst_codes : dict[str,str] = {
     'UC' : 'E'
 }
 
+# from https://stackoverflow.com/questions/38834378/path-to-a-directory-as-argparse-argument
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+
 def replaceLabel(label):
     def r(l):
         if (l[0] == '.'):
@@ -144,9 +155,9 @@ def replaceMacros(parts: list[str]):
     return toreturn
 
     
-def assemble(args):
+def assemble(filename: str):
     # find the labels and their addresses
-    f = open(args.file, 'r')
+    f = open(filename, 'r')
 
     address = -1
 
@@ -203,15 +214,21 @@ def assemble(args):
     print(f"Labels found: {labels}")
     print(f'Macros found: {macros}')
 
-    f = open(args.file, 'r')
-    out_name = str(args.file.rsplit('.', 1)[0] + '.dat')
-    wf = open(out_name, 'w')
-    sf = open('stripped.mc', 'w')
+    f = open(filename, 'r')
+    filename = filename.replace('\\', '/')
+    start = filename.rindex('/')+1 if '/' in filename else 0
+    out_name = f"{output_dir}{filename[start:filename.rindex('.')]}.dat"
+    wf = open(f"{out_name}", 'w')
+    sf = open(f'{output_dir}stripped.mc', 'w')
 
+    ram = False
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
         parts = replaceMacros(line.split())
+        if len(parts) > 0 and line[0] == '@':
+            ram = True
+            break
         if len(parts) > 0 and line[0] != '.' and line[0] != '`':
             for part in parts:
                 sf.write(part + ' ')
@@ -332,21 +349,61 @@ def assemble(args):
                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                 else:
                     wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
+            elif instr == 'NOP':
+                # Hardcode NOP as OR %r0 %r0
+                wf.write('0020\n')
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
 
-    # while(address < 1023):
-    #     wf.write('0000\n')
-    #     address = address + 1
+    if ram:
+        while address < RAM_START-1:
+            wf.write('0000\n')
+            address += 1
+        mode = f.readline()
+        if mode == 'DECIMAL\n':
+            for line in f:
+                if len(line) > 1:
+                    parsed_line = int(line[:-1])
+                    formatted_line = f'{parsed_line:04X}'
+                    wf.write(f'{formatted_line}\n')
+                    address += 1
+        else:
+            sys.exit(f"Unsupported RAM encoding mode: {mode[:-1]}")
+
+    if not short_file:
+        while address < FILE_LENGTH-1:
+            wf.write('0000\n')
+            address = address + 1
     wf.close()
     f.close()
 
 def main():
-    parser = argparse.ArgumentParser(description='This is the Assembler')
-    parser.add_argument('-f', dest='file')
+    parser = argparse.ArgumentParser(description='This is the CR16 Assembler')
+    parser.add_argument('file', nargs='?', help='The asm file to assemble')
+    parser.add_argument('--dir', type=dir_path, help='A directory of asm files to assemble')
+    parser.add_argument('--dest', type=dir_path, help='A directory to store resulting .dat files')
+    parser.add_argument('-s', '--short', action='store_true', help='Do not write 0\'s to size of RAM')
     args = parser.parse_args()
-    assemble(args)
+    global short_file
+    short_file = args.short
+
+    global output_dir
+    if args.dest == None:
+        if args.dir == None:
+            output_dir = './'
+        else:
+            output_dir = f'{args.dir}/'
+    else:
+        output_dir = f'{args.dest}/'
+
+    if args.file != None:
+        assemble(args.file)
+    elif args.dir != None:
+        for f in os.listdir(args.dir):
+            assemble(f'{args.dir}/{f}')
+    else:
+        sys.exit('argument error: must provide file or directory of files to assemble')
   
 if __name__ == "__main__":
     main()
