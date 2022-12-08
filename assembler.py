@@ -301,9 +301,13 @@ def assemble(filename: str):
                             # it's a label, but it doesn't fit in just a MOVI inst
                             # so expand it to MOVI + LUI
                             hex_imm = f'{parsed_imm:04X}'
-                            wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[:2] + '\n')
+                            wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[2:] + '\n')
                             address += 1
-                            wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[2:] + '\n')
+                            wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[:2] + '\n')
+                            # botch job to make label dictionary still accurate
+                            for label in labels:
+                                if labels[label] > address:
+                                    labels[label] += 1
                             continue
                     else:
                         sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
@@ -436,6 +440,7 @@ def assemble(filename: str):
             address = address + 1
     wf.close()
     f.close()
+    print(f'End labels: {labels}')
 
 def main():
     parser = argparse.ArgumentParser(description='This is the CR16 Assembler')
