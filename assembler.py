@@ -304,7 +304,9 @@ def assemble(filename: str):
                                     +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
                         else:  
                             formatted_imm = f'{parsed_imm:01X}'
-                            wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
+                            sign_bit = parsed_imm < 0
+                            # TODO: Bandaid fix, ASHUI is now unsupported
+                            wf.write('8' + reg_codes[r_dst] + str(int(sign_bit)) + formatted_imm + '\n')
             elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) != 1:
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
