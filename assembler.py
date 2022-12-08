@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 
-labels = {}
+labels: dict[str,int] = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
 
@@ -51,7 +51,9 @@ reg_codes : dict[str,str] = {
     '%rc': 'C',
     '%rd': 'D',
     '%re': 'E',
-    '%rf': 'F'
+    '%rf': 'F',
+    '%csp': 'F',
+    '%gsp': 'E'
 }
 
 inst_codes : dict[str,str] = {
@@ -131,6 +133,9 @@ def dir_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
+def byte(number, i):
+    return (number & (0xff << (i * 8))) >> (i * 8)
+
 def replaceLabel(label):
     def r(l):
         if (l[0] == '.'):
@@ -187,6 +192,18 @@ def precompile(filename):
                     df.write(f'MOV {reg} {parameter_regs[i]}\n')
             df.write(f'MOVI {label} %rA\n')
             df.write(f'JAL %rA %rA\n')
+        elif len(parts) > 0 and parts[0] == 'MOVW':
+            if len(parts) < 3:
+                sys.exit('not enough MOVW args')
+            imm = parts[1]
+            rdst = parts[2]
+            parsed_imm = int(imm, 0)
+            if parsed_imm > 0xFFFF:
+                sys.exit(f'MOVW imm too large, must be less than 0xFFFF, found {parsed_imm}')
+            lo_byte = byte(parsed_imm, 0)
+            hi_byte = byte(parsed_imm, 1)
+            df.write(f'MOVI ${lo_byte} {rdst}\n')
+            df.write(f'LUI ${hi_byte} {rdst}\n')
         else:
             df.write(' '.join(parts) + '\n')
 
@@ -214,17 +231,14 @@ def assemble(filename: str):
                     odd = True
                     labelAddress -= 1
                     
-                count = 0
                 # reduce to shift for 8-bit immediate
-                while labelAddress > 127:
-                    labelAddress /= 2
-                    count += 1
+                # while labelAddress > 127:
+                #     labelAddress //= 2
 
                 label = parts.pop(0)
 
                 jpoint_instrs[label] = {
                     'initial_immd': labelAddress,
-                    'shift_count': count,
                     'is_odd': odd	
                 }	
                 if odd:
@@ -324,12 +338,15 @@ def assemble(filename: str):
                         sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                     else:
                         parsed_imm = int(imm[1:])
-                        if parsed_imm > 15 or 0 > parsed_imm:
+                        if parsed_imm > 15 or -5 > parsed_imm:
                             sys.exit(f'ERROR: Out of range imm on line {i+1} in inst {x}'
                                     +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
                         else:  
-                            formatted_imm = f'{parsed_imm:01X}'
-                            wf.write('8' + reg_codes[r_dst] + inst_codes[instr] + formatted_imm + '\n')
+                            # formatted_imm = f'{parsed_imm:01X}'
+                            formatted_imm = hex((parsed_imm + (1 << 4)) % (1 << 4))[2:]
+                            sign_bit = parsed_imm < 0
+                            # TODO: Bandaid fix, ASHUI is now unsupported
+                            wf.write('8' + reg_codes[r_dst] + str(int(sign_bit)) + formatted_imm + '\n')
             elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
                 if len(parts) != 1:
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
@@ -375,6 +392,16 @@ def assemble(filename: str):
             elif instr == 'NOP':
                 # Hardcode NOP as OR %r0 %r0
                 wf.write('0020\n')
+            elif instr == 'RAND':
+                if len(parts) != 1:
+                    sys.exit(f'too many args for RAND, line {i+1}')
+                else:
+                    r_dst = parts[0]
+                    if r_dst not in reg_codes:
+                        sys.exit(f'Unkown register in RAND on line {i+1}')
+                    else:
+                        wf.write(f'4{reg_codes[r_dst]}F0\n')
+
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
@@ -385,7 +412,8 @@ def assemble(filename: str):
             address += 1
         mode = f.readline()
         if mode == 'DECIMAL\n':
-            for line in f:
+            for x in f:
+                line = x.split('#')[0]
                 if len(line) > 1:
                     parsed_line = int(line[:-1])
                     formatted_line = f'{parsed_line:04X}'
