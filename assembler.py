@@ -6,8 +6,8 @@ labels = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
 
-RAM_START = 8192
-FILE_LENGTH = 16384
+RAM_START = 0x2000
+FILE_LENGTH = 0x4000
 
 r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
@@ -360,7 +360,8 @@ def assemble(filename: str):
             address += 1
         mode = f.readline()
         if mode == 'DECIMAL\n':
-            for line in f:
+            for x in f:
+                line = x.split('#')[0] # Remove end of line comments
                 if len(line) > 1:
                     parsed_line = int(line[:-1])
                     formatted_line = f'{parsed_line:04X}'
