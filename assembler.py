@@ -297,6 +297,14 @@ def assemble(filename: str):
                         parsed_imm = int(imm[1:])
                     elif imm[0] == '.':
                         parsed_imm = labels[imm]
+                        if parsed_imm > 0xFF:
+                            # it's a label, but it doesn't fit in just a MOVI inst
+                            # so expand it to MOVI + LUI
+                            hex_imm = f'{parsed_imm:04X}'
+                            wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[:2] + '\n')
+                            address += 1
+                            wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[2:] + '\n')
+                            continue
                     else:
                         sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
                                 +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
