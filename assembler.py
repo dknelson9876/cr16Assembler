@@ -21,34 +21,22 @@ sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
 zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 
 reg_codes : dict[str,str] = {
-    '%r0': '0',
-    '%r1': '1',
-    '%r2': '2',
-    '%r3': '3',
-    '%r4': '4',
-    '%r5': '5',
-    '%r6': '6',
-    '%r7': '7',
-    '%r8': '8',
-    '%r9': '9',
-    '%r10': 'A',
-    '%r11': 'B',
-    '%r12': 'C',
-    '%r13': 'D',
-    '%r14': 'E',
-    '%r15': 'F',
-    '%rA': 'A',
-    '%rB': 'B',
-    '%rC': 'C',
-    '%rD': 'D',
-    '%rE': 'E',
-    '%rF': 'F',
-    '%ra': 'A',
-    '%rb': 'B',
-    '%rc': 'C',
-    '%rd': 'D',
-    '%re': 'E',
-    '%rf': 'F'
+    'r0': '0',
+    'r1': '1',
+    'r2': '2',
+    'r3': '3',
+    'r4': '4',
+    'r5': '5',
+    'r6': '6',
+    'r7': '7',
+    'r8': '8',
+    'r9': '9',
+    'r10': 'A',
+    'r11': 'B',
+    'r12': 'C',
+    'r13': 'D',
+    'rA':  'E',
+    'rsp': 'F'
 }
 
 inst_codes : dict[str,str] = {
@@ -122,7 +110,19 @@ inst_codes : dict[str,str] = {
 }
 
 # from https://stackoverflow.com/questions/38834378/path-to-a-directory-as-argparse-argument
-def dir_path(path):
+def dir_path(path: str) -> str:
+    """Check if a str is a valid file path. Returns the path if it's valid, else raises 
+        ArgumentTypeError
+
+    Args:
+        path (str): The str to check
+
+    Raises:
+        argparse.ArgumentTypeError: if path is not a valid file path
+
+    Returns:
+        str: path, if it is valid
+    """
     if os.path.isdir(path):
         return path
     else:
@@ -234,7 +234,7 @@ def assemble(filename: str):
                 sf.write(part + ' ')
             sf.write('\n')
             address = address + 1
-            instr = parts.pop(0)
+            instr = parts.pop(0).upper()
             if instr == 'WAIT':
                 wf.write('0000\n')
             elif instr in r_type_insts: # ----------------------------------------------------------------------------------------
@@ -380,30 +380,43 @@ def assemble(filename: str):
     f.close()
 
 def main():
+    # Builds the argument menu and provide the strings used when
+    #   `py assembler.py -h` or `py assembler.py --help` is run
     parser = argparse.ArgumentParser(description='This is the CR16 Assembler')
     parser.add_argument('file', nargs='?', help='The asm file to assemble')
     parser.add_argument('--dir', type=dir_path, help='A directory of asm files to assemble')
     parser.add_argument('--dest', type=dir_path, help='A directory to store resulting .dat files')
     parser.add_argument('-s', '--short', action='store_true', help='Do not write 0\'s to size of RAM')
     args = parser.parse_args()
-    global short_file
-    short_file = args.short
 
-    global output_dir
+    # Retrieve the information that was provided as flags through the `args` object
+    global short_file # should the resulting file be 0 filled to the length of the file?
+    short_file: bool = args.short
+
+    global output_dir # where should the resulting file be put
     if args.dest == None:
         if args.dir == None:
+            # provided no destination directory or directory to load from
+            # Use current folder as output
             output_dir = './'
         else:
+            # provided a directory to read from, but no output directory
+            # Use provided loading directory as output directory
             output_dir = f'{args.dir}/'
     else:
+        # Provided an output directory
+        # Use it
         output_dir = f'{args.dest}/'
 
     if args.file != None:
+        # if a single file was provided, assemble it directly
         assemble(args.file)
     elif args.dir != None:
+        # if a directory was provided, assemble each file in it
         for f in os.listdir(args.dir):
             assemble(f'{args.dir}/{f}')
     else:
+        # if there wasn't a file or directory to load, error out
         sys.exit('argument error: must provide file or directory of files to assemble')
   
 if __name__ == "__main__":
