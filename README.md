@@ -1,5 +1,11 @@
 # CR16 Assembler
 
+## Usage
+
+### 1. Consult all '`FILL ME IN`' comments
+
+This includes `RAM_START`, `FILE_LENGTH`, `INST_SETS`, `reg_codes`, `inst_codes`
+
 ## CR16 Syntax
 
 These are all pulled from/based on the full [CR16 Programmer's Reference Manual](https://my.eng.utah.edu/~cs3710/handouts/cr16a-prog-ref.pdf), with some syntax additions to help reduce mistakes

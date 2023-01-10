@@ -6,9 +6,25 @@ labels = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
 
+# FILL ME IN----------RAM_START----------
+# RAM_START is the number of lines that should be zero-filled before 
+#   adding the data found after the @RAM tag
 RAM_START = 0x2000
+# FILL ME IN----------FILE_LENGTH---------
+# FILE_LENGTH is the number of lines that the file should be after 
+#   done assembling. It will be zero-filled to this length. 
+#   To not zero-fill the resulting file, pass the -s or --short flag
+#   from the command line.
 FILE_LENGTH = 0x4000
 
+# FILL ME IN-------------INST_SETS-------
+# The following sets are used to determine which pattern to follow in 
+#   encoding an instruction. Any custom instruction that fits an existing
+#   pattern can just be added to matching set and inst_codes below. If you 
+#   have a single instruction that needs a new pattern, you're best off 
+#   checking for it directly (see NOP encoding below). If you have a group
+#   of new instructions with a different encoding pattern, make a new set
+#   for them here, and a new if statement below
 r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
 i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 sh_type_insts =  {'LSH', 'ALSH'}
@@ -20,6 +36,10 @@ spec_type_insts= {'LOAD', 'STOR', 'JAL'}
 sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
 zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 
+
+# FILL ME IN-----------reg_codes----------
+# reg_codes is the dictionary used to convert register names
+#   to numbers. If you have any custom register names, define them here.
 reg_codes : dict[str,str] = {
     'r0': '0',
     'r1': '1',
@@ -39,6 +59,11 @@ reg_codes : dict[str,str] = {
     'rsp': 'F'
 }
 
+
+# FILL ME IN-------------inst_codes--------
+# inst_codes is the dictionary used to convert instruction names
+#   to numbers. If you have any custom instructions, define them here.
+#   Both op codes and extended op codes use the same dictionary.
 inst_codes : dict[str,str] = {
     'REGISTER_TYPE': '0',
     'WAIT':  '0',
@@ -128,22 +153,21 @@ def dir_path(path: str) -> str:
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-def replaceLabel(label):
-    def r(l):
-        if (l[0] == '.'):
-            return '$' + str(labels[l])
-        else:
-            return l
 
-    if (label.startswith('JPT')):
-        return label
-    else:
-        m = map(r, label.split())
-        return ' '.join(m)
+def replaceMacros(parts: list[str]) -> list[str]:
+    """Given a single full instruction as a list of strings, 
+        return a new list of strings that has any macros replaced
+        with their definition
 
-def replaceMacros(parts: list[str]):
+    Args:
+        parts (list[str]): an instruction that may contain macros
+
+    Returns:
+        list[str]: an instruction with all macros replaced
+    """
     toreturn: list[str] = []
-    if len(parts) > 0 and parts[0] == '`define': return []
+    if len(parts) > 0 and parts[0] == '`define': 
+        return []
     for s in parts:
         if s[0] == '`':
             if s[1:] in macros:
@@ -155,10 +179,16 @@ def replaceMacros(parts: list[str]):
     return toreturn
 
     
-def assemble(filename: str):
-    # find the labels and their addresses
-    f = open(filename, 'r')
+def assemble(filename: str) -> None:
+    """Given a valid filename of an assembly file, encodes and writes it 
+        to a new file with the same name and extension `.dat`. In the process,
+        two other files are created to help in debugging. 
 
+    Args:
+        filename (str): a filename
+    """
+
+    f = open(filename, 'r')
     address = -1
 
     # Build the dict for resolving labels
@@ -341,6 +371,7 @@ def assemble(filename: str):
                         sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                     else:
                         wf.write(inst_codes['SPECIAL_TYPE'] + inst_codes[instr[1:]] + inst_codes['JUMP'] + reg_codes[r_src] + '\n')
+            # Encoding pattern for Special type Instructions
             elif instr in spec_type_insts:
                 if len(parts) != 2:
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
@@ -349,6 +380,7 @@ def assemble(filename: str):
                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                 else:
                     wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
+            # Unique encoding pattern for NOP
             elif instr == 'NOP':
                 # Hardcode NOP as OR %r0 %r0
                 wf.write('0020\n')
@@ -391,7 +423,7 @@ def main():
 
     # Retrieve the information that was provided as flags through the `args` object
     global short_file # should the resulting file be 0 filled to the length of the file?
-    short_file: bool = args.short
+    short_file = args.short
 
     global output_dir # where should the resulting file be put
     if args.dest == None:
