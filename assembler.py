@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 
-labels = {}
+labels: dict[str,int] = {}
 jpoint_instrs = {}
 macros : dict[str,str] = {}
 
@@ -35,6 +35,12 @@ spec_type_insts= {'LOAD', 'STOR', 'JAL'}
 
 sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
 zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
+
+# Used by CALL expansion
+parameter_regs = ['%r8', '%r9', '%rB', '%rC', '%rD']
+
+# Used by CALL expansion
+parameter_regs = ['%r8', '%r9', '%rB', '%rC', '%rD']
 
 
 # FILL ME IN-----------reg_codes----------
@@ -154,6 +160,9 @@ def dir_path(path: str) -> str:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 
+def byte(number, i):
+    return (number & (0xff << (i * 8))) >> (i * 8)
+
 def replaceMacros(parts: list[str]) -> list[str]:
     """Given a single full instruction as a list of strings, 
         return a new list of strings that has any macros replaced
@@ -178,7 +187,54 @@ def replaceMacros(parts: list[str]) -> list[str]:
             toreturn.append(s)
     return toreturn
 
+def precompile(filename):
+    f = open(filename, 'r')
+    df = open('defined.mc', 'w')
+
+    # Find all macro definitions
+    for x in f:
+        line = x.split('#')[0]
+        parts = line.split()
+
+        if len(parts) > 0 and parts[0]=='`define':
+            macros[parts[1]] = parts[2]
     
+    print(f'Macros found: {macros}')
+
+    f.seek(0)
+
+    for line in f:
+        parts = replaceMacros(line.split())
+        if len(parts) > 0 and parts[0] == 'CALL':
+            if len(parts) < 2:
+                sys.exit('not enough CALL args')
+            label = parts[1]
+            reglist = parts[2][1:-1].split(',')
+            if len(reglist) > 5:
+                sys.exit('too many parameters')
+            for i, reg in enumerate(reglist):
+                if reg != '':
+                    df.write(f'MOV {reg} {parameter_regs[i]}\n')
+            df.write(f'MOVI {label} %rA\n')
+            df.write(f'JAL %rA %rA\n')
+        elif len(parts) > 0 and parts[0] == 'MOVW':
+            if len(parts) < 3:
+                sys.exit('not enough MOVW args')
+            imm = parts[1]
+            rdst = parts[2]
+            parsed_imm = int(imm, 0)
+            if parsed_imm > 0xFFFF:
+                sys.exit(f'MOVW imm too large, must be less than 0xFFFF, found {parsed_imm}')
+            lo_byte = byte(parsed_imm, 0)
+            hi_byte = byte(parsed_imm, 1)
+            df.write(f'MOVI ${lo_byte} {rdst}\n')
+            df.write(f'LUI ${hi_byte} {rdst}\n')
+        else:
+            df.write(' '.join(parts) + '\n')
+
+    f.close()
+    df.close()
+
 def assemble(filename: str) -> None:
     """Given a valid filename of an assembly file, encodes and writes it 
         to a new file with the same name and extension `.dat`. In the process,
@@ -188,7 +244,7 @@ def assemble(filename: str) -> None:
         filename (str): a filename
     """
 
-    f = open(filename, 'r')
+    f = open('defined.mc', 'r')
     address = -1
 
     # Build the dict for resolving labels
@@ -206,17 +262,14 @@ def assemble(filename: str) -> None:
                     odd = True
                     labelAddress -= 1
                     
-                count = 0
                 # reduce to shift for 8-bit immediate
-                while labelAddress > 127:
-                    labelAddress /= 2
-                    count += 1
+                # while labelAddress > 127:
+                #     labelAddress //= 2
 
                 label = parts.pop(0)
 
                 jpoint_instrs[label] = {
                     'initial_immd': labelAddress,
-                    'shift_count': count,
                     'is_odd': odd	
                 }	
                 if odd:
@@ -227,24 +280,11 @@ def assemble(filename: str) -> None:
             else:
                 address = address + 1
 
-    f.seek(0)
-
-    # Find all macro definitions
-    for x in f:
-        line = x.split('#')[0]
-        parts = line.split()
-
-        if len(parts) > 0 and parts[0]=='`define':
-            macros[parts[1]] = parts[2]
-
-
-
     f.close()
 
     print(f"Labels found: {labels}")
-    print(f'Macros found: {macros}')
 
-    f = open(filename, 'r')
+    f = open('defined.mc', 'r')
     filename = filename.replace('\\', '/')
     start = filename.rindex('/')+1 if '/' in filename else 0
     out_name = f"{output_dir}{filename[start:filename.rindex('.')]}.dat"
@@ -255,7 +295,7 @@ def assemble(filename: str) -> None:
     address = -1
     for i, x in enumerate(f):
         line = x.split('#')[0] # discard comment at end of line
-        parts = replaceMacros(line.split())
+        parts = line.split()
         if len(parts) > 0 and line[0] == '@':
             ram = True
             break
@@ -287,7 +327,19 @@ def assemble(filename: str) -> None:
                     if imm[0] == '$':
                         parsed_imm = int(imm[1:])
                     elif imm[0] == '.':
-                        parsed_imm = labels[imm] - address
+                        parsed_imm = labels[imm]
+                        if parsed_imm > 0xFF:
+                            # it's a label, but it doesn't fit in just a MOVI inst
+                            # so expand it to MOVI + LUI
+                            hex_imm = f'{parsed_imm:04X}'
+                            wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[2:] + '\n')
+                            address += 1
+                            wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[:2] + '\n')
+                            # botch job to make label dictionary still accurate
+                            for label in labels:
+                                if labels[label] > address:
+                                    labels[label] += 1
+                            continue
                     else:
                         sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
                                 +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
@@ -329,11 +381,12 @@ def assemble(filename: str) -> None:
                         sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                     else:
                         parsed_imm = int(imm[1:])
-                        if parsed_imm > 15 or 0 > parsed_imm:
+                        if parsed_imm > 15 or -5 > parsed_imm:
                             sys.exit(f'ERROR: Out of range imm on line {i+1} in inst {x}'
                                     +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
                         else:  
-                            formatted_imm = f'{parsed_imm:01X}'
+                            # formatted_imm = f'{parsed_imm:01X}'
+                            formatted_imm = hex((parsed_imm + (1 << 4)) % (1 << 4))[2:]
                             sign_bit = parsed_imm < 0
                             # TODO: Bandaid fix, ASHUI is now unsupported
                             wf.write('8' + reg_codes[r_dst] + str(int(sign_bit)) + formatted_imm + '\n')
@@ -384,6 +437,16 @@ def assemble(filename: str) -> None:
             elif instr == 'NOP':
                 # Hardcode NOP as OR %r0 %r0
                 wf.write('0020\n')
+            elif instr == 'RAND':
+                if len(parts) != 1:
+                    sys.exit(f'too many args for RAND, line {i+1}')
+                else:
+                    r_dst = parts[0]
+                    if r_dst not in reg_codes:
+                        sys.exit(f'Unkown register in RAND on line {i+1}')
+                    else:
+                        wf.write(f'4{reg_codes[r_dst]}F0\n')
+
 
             else: # ----------------------------------------------------------------------------------------
                 sys.exit('Syntax Error: not a valid instruction: ' + line)
@@ -410,6 +473,7 @@ def assemble(filename: str) -> None:
             address = address + 1
     wf.close()
     f.close()
+    print(f'End labels: {labels}')
 
 def main():
     # Builds the argument menu and provide the strings used when
@@ -442,10 +506,12 @@ def main():
 
     if args.file != None:
         # if a single file was provided, assemble it directly
+        precompile(args.file)
         assemble(args.file)
     elif args.dir != None:
         # if a directory was provided, assemble each file in it
         for f in os.listdir(args.dir):
+            precompile(f'{args.dir}/{f}')
             assemble(f'{args.dir}/{f}')
     else:
         # if there wasn't a file or directory to load, error out
