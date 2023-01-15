@@ -31,17 +31,19 @@ sh_type_insts =  {'LSH', 'ALSH'}
 shi_type_insts = {'LSHI', 'ALSHI'}
 b_type_insts =   {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
 j_type_insts =   {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
-spec_type_insts= {'LOAD', 'STOR', 'JAL'}
+# spec_type_a_insts encode the registers in the order they appear
+spec_type_a_insts= {'LOAD', 'STOR', 'JAL', 'LPR', 'SPR'}
+# spec_type_b_insts encode the registers in the opposite order
+spec_type_b_insts = {'SNXB', 'ZRXB', 'TBIT'}
 
+# For every I type inst, identify whether the imm is sign or zero extended, so that proper range checking can happen
 sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
 zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 
-# Used by CALL expansion
-parameter_regs = ['%r8', '%r9', '%rB', '%rC', '%rD']
-
-# Used by CALL expansion
-parameter_regs = ['%r8', '%r9', '%rB', '%rC', '%rD']
-
+# FILL ME IN-----------parameter_regs-------
+# parameter_regs are the regs that will automatically be filled in
+#   by the CALL macro from the list of regs provided
+parameter_regs = ['r8', 'r9', 'r10', 'r11', 'r12']
 
 # FILL ME IN-----------reg_codes----------
 # reg_codes is the dictionary used to convert register names
@@ -61,8 +63,8 @@ reg_codes : dict[str,str] = {
     'r11': 'B',
     'r12': 'C',
     'r13': 'D',
-    'rA':  'E',
-    'rsp': 'F'
+    'rA':  'E', # return address
+    'rsp': 'F'  # stack pointer
 }
 
 
@@ -191,9 +193,9 @@ def precompile(filename):
     f = open(filename, 'r')
     df = open('defined.mc', 'w')
 
-    # Find all macro definitions
+    # Find all `define s
     for x in f:
-        line = x.split('#')[0]
+        line = x.split('#')[0] # cut off end of line comments
         parts = line.split()
 
         if len(parts) > 0 and parts[0]=='`define':
@@ -203,6 +205,7 @@ def precompile(filename):
 
     f.seek(0)
 
+    # Find and replace all macro functions
     for line in f:
         parts = replaceMacros(line.split())
         if len(parts) > 0 and parts[0] == 'CALL':
@@ -210,8 +213,8 @@ def precompile(filename):
                 sys.exit('not enough CALL args')
             label = parts[1]
             reglist = parts[2][1:-1].split(',')
-            if len(reglist) > 5:
-                sys.exit('too many parameters')
+            if len(reglist) > len(parameter_regs):
+                sys.exit('too many regs passed to fit in the known parameter regs')
             for i, reg in enumerate(reglist):
                 if reg != '':
                     df.write(f'MOV {reg} {parameter_regs[i]}\n')
@@ -222,7 +225,7 @@ def precompile(filename):
                 sys.exit('not enough MOVW args')
             imm = parts[1]
             rdst = parts[2]
-            parsed_imm = int(imm, 0)
+            parsed_imm = int(imm, 0) # the 0 tells int() to infer decimal or hex
             if parsed_imm > 0xFFFF:
                 sys.exit(f'MOVW imm too large, must be less than 0xFFFF, found {parsed_imm}')
             lo_byte = byte(parsed_imm, 0)
@@ -425,7 +428,7 @@ def assemble(filename: str) -> None:
                     else:
                         wf.write(inst_codes['SPECIAL_TYPE'] + inst_codes[instr[1:]] + inst_codes['JUMP'] + reg_codes[r_src] + '\n')
             # Encoding pattern for Special type Instructions
-            elif instr in spec_type_insts:
+            elif instr in spec_type_a_insts:
                 if len(parts) != 2:
                     sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
                 r_first, r_sec = parts
@@ -433,19 +436,27 @@ def assemble(filename: str) -> None:
                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
                 else:
                     wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
+            elif instr in spec_type_b_insts:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                r_first, r_sec = parts
+                if r_first not in reg_codes or r_sec not in reg_codes:
+                    sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                else:
+                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_sec] + inst_codes[instr] + reg_codes[r_first] + '\n')
+            # UNIQUE INSTRUCTIONS---------------------------------------------------------------------------------------
             # Unique encoding pattern for NOP
             elif instr == 'NOP':
                 # Hardcode NOP as OR %r0 %r0
                 wf.write('0020\n')
-            elif instr == 'RAND':
-                if len(parts) != 1:
-                    sys.exit(f'too many args for RAND, line {i+1}')
-                else:
-                    r_dst = parts[0]
-                    if r_dst not in reg_codes:
-                        sys.exit(f'Unkown register in RAND on line {i+1}')
-                    else:
-                        wf.write(f'4{reg_codes[r_dst]}F0\n')
+            elif instr == 'DI':
+                wf.write('4030\n')
+            elif instr == 'EI':
+                wf.write('4070\n')
+            elif instr == 'RETX':
+                wf.write('4090\n')
+            elif instr == 'WAIT':
+                wf.write('0000\n')
 
 
             else: # ----------------------------------------------------------------------------------------
