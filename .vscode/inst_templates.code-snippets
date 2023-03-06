@@ -1,0 +1,33 @@
+{
+	// Place your cr16Assembler workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
+	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
+	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
+	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
+	// Placeholders with the same ids are connected.
+	// Example:
+	// "Print to console": {
+	// 	"scope": "javascript,typescript",
+	// 	"prefix": "log",
+	// 	"body": [
+	// 		"console.log('$1');",
+	// 		"$2"
+	// 	],
+	// 	"description": "Log output to console"
+	// }
+	"mathPair": {
+		"scope": "python",
+		"prefix": "math",
+		"body":[
+			"'${1:op}': ('RR', lambda rsrc, rdst: f'0{rdst}${2:code}{rsrc}'),",
+    		"'${1:op}I': ('R8${3:signed}', lambda imm, rdst: f'${2:code}{rdst}{imm:02X}')$0",
+		]
+	},
+	"Empty RR Instruction": {
+		"scope": "python",
+		"prefix": "rr",
+		"body":[
+			"'${1:op}': ('RR', lambda ${2:reg1}, ${3:reg2}: f'${4:opcode}{${5:reg}}${6:funccode}{${7:reg}}')"
+		]
+	}
+}
