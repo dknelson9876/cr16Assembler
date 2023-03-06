@@ -1,9 +1,9 @@
 import os
 import sys
 import argparse
-from typing import Dict, List, Tuple
 
 labels: dict[str,int] = {}
+jpoint_instrs = {}
 macros : dict[str,str] = {}
 
 # FILL ME IN----------RAM_START----------
@@ -25,125 +25,20 @@ FILE_LENGTH = 0x4000
 #   checking for it directly (see NOP encoding below). If you have a group
 #   of new instructions with a different encoding pattern, make a new set
 #   for them here, and a new if statement below
-# r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
-# i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
-# sh_type_insts =  {'LSH', 'ALSH'}
-# shi_type_insts = {'LSHI', 'ALSHI'}
-# b_type_insts =   {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
-# j_type_insts =   {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
-# # spec_type_a_insts encode the registers in the order they appear
-# spec_type_a_insts= {'LOAD', 'STOR', 'JAL', 'LPR', 'SPR'}
-# # spec_type_b_insts encode the registers in the opposite order
-# spec_type_b_insts = {'SNXB', 'ZRXB', 'TBIT'}
-
-
-# a dictionary that maps every supported instruction to it's type that determines 
-#   how operands will be passed to the function
-# a function with a matching name must also be implemented
-# valid inst types include: 
-#   - RR (two registers)
-#   - R8I (register + 8-bit immediate)
-#   - R5I (register + 5-bit immediate) (the shift imm insts)
-#   - B (branch)
-#   - J (jump)
-#   - N (no operands)
-#   - R4I (register + 4-bit imm) (only TBITI)
-#   - 4I (4-bit imm) (only EXCP)
-opcode_table: Dict[str,Tuple] = {
-    'ADD': ('RR', lambda rsrc, rdst: f'0{rdst:1X}5{rsrc:1X}'),
-    'ADDI': ('R8I', lambda imm, rdst: f'5{rdst:1X}{imm:02X}'),
-    'ADDU': ('RR', lambda rsrc, rdst: f'0{rdst:1X}6{rsrc:1X}'),
-    # 'ADDUI': 'R8I',
-    # 'ADDC': 'RR',
-    # 'ADDCI': 'R8I',
-    # 'MUL': 'RR',
-    # 'MULI': 'R8I',
-    # 'SUB': 'RR',
-    # 'SUBI': 'R8I',
-    # 'SUBC': 'RR',
-    # 'SUBCI': 'R8I',
-    # 'CMP': 'RR',
-    # 'CMPI': 'R8I',
-    # 'AND': 'RR',
-    # 'ANDI': 'R8I',
-    # 'OR': 'RR',
-    # 'ORI': 'R8I',
-    # 'XOR': 'RR',
-    # 'XORI': 'R8I',
-    # 'MOV': 'RR',
-    # 'MOVI': 'R8I',
-    # 'LSH': 'RR',
-    # 'LSHI': 'L5I',
-    # 'ASHU': 'RR',
-    # 'ASHUI': 'R5I',
-    # 'LUI': 'R8I',
-    # 'LOAD': 'RR',
-    # 'STOR': 'RR',
-    # 'SNXB': 'RR',
-    # 'ZRXB': 'RR',
-    # 'JAL': 'RR',
-    # 'TBIT': 'RR',
-    # 'TBITI': 'R4I',
-    # 'LPR': 'RR',
-    # 'SPR': 'RR',
-    # 'DI': 'N',
-    # 'EI': 'N',
-    # 'EXCP': '4I',
-    # 'RETX': 'N',
-    # 'WAIT': 'N',
-    
-    # 'BEQ': 'B',
-    # 'BNE': 'B',
-    # 'BCS': 'B',
-    # 'BCC': 'B',
-    # 'BHI': 'B',
-    # 'BLS': 'B',
-    # 'BGT': 'B',
-    # 'BLE': 'B',
-    # 'BFS': 'B',
-    # 'BFC': 'B',
-    # 'BLO': 'B',
-    # 'BHS': 'B',
-    # 'BLT': 'B',
-    # 'BGE': 'B',
-    # 'BUC': 'B',
-    
-    # 'JEQ': 'J',
-    # 'JNE': 'J',
-    # 'JCS': 'J',
-    # 'JCC': 'J',
-    # 'JHI': 'J',
-    # 'JLS': 'J',
-    # 'JGT': 'J',
-    # 'JLE': 'J',
-    # 'JFS': 'J',
-    # 'JFC': 'J',
-    # 'JLO': 'J',
-    # 'JHS': 'J',
-    # 'JLT': 'J',
-    # 'JGE': 'J',
-    # 'JUC': 'J',
-    
-    # 'SEQ': 'S',
-    # 'SNE': 'S',
-    # 'SCS': 'S',
-    # 'SCC': 'S',
-    # 'SHI': 'S',
-    # 'SLS': 'S',
-    # 'SGT': 'S',
-    # 'SLE': 'S',
-    # 'SFS': 'S',
-    # 'SFC': 'S',
-    # 'SLO': 'S',
-    # 'SHS': 'S',
-    # 'SLT': 'S',
-    # 'SGE': 'S',
-    # 'SUC': 'S'
-}
+r_type_insts =   {'ADD',  'ADDU',  'ADDC',  'MUL',  'SUB',  'SUBC',  'CMP',  'AND',  'OR',  'XOR',  'MOV'}
+i_type_insts =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI', 'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
+sh_type_insts =  {'LSH', 'ALSH'}
+shi_type_insts = {'LSHI', 'ALSHI'}
+b_type_insts =   {'BEQ', 'BNE', 'BGE', 'BCS', 'BCC', 'BHI', 'BLS', 'BLO', 'BHS', 'BGT', 'BLE', 'BFS', 'BFC', 'BLT', 'BUC'}
+j_type_insts =   {'JEQ', 'JNE', 'JGE', 'JCS', 'JCC', 'JHI', 'JLS', 'JLO', 'JHS', 'JGT', 'JLE', 'JFS', 'JFC', 'JLT', 'JUC'}
+# spec_type_a_insts encode the registers in the order they appear
+spec_type_a_insts= {'LOAD', 'STOR', 'JAL', 'LPR', 'SPR'}
+# spec_type_b_insts encode the registers in the opposite order
+spec_type_b_insts = {'SNXB', 'ZRXB', 'TBIT'}
 
 # For every I type inst, identify whether the imm is sign or zero extended, so that proper range checking can happen
-# sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
-# zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
+sign_ext_imm =   {'ADDI', 'ADDUI', 'ADDCI', 'MULI', 'SUBI', 'SUBCI', 'CMPI'}
+zero_ext_imm =   {'ANDI', 'ORI', 'XORI', 'MOVI', 'LUI'}
 
 # FILL ME IN-----------parameter_regs-------
 # parameter_regs are the regs that will automatically be filled in
@@ -173,6 +68,79 @@ reg_codes : dict[str,str] = {
 }
 
 
+# FILL ME IN-------------inst_codes--------
+# inst_codes is the dictionary used to convert instruction names
+#   to numbers. If you have any custom instructions, define them here.
+#   Both op codes and extended op codes use the same dictionary.
+inst_codes : dict[str,str] = {
+    'REGISTER_TYPE': '0',
+    'WAIT':  '0',
+    'AND':   '1',
+    'ANDI':  '1',
+    'OR':    '2',
+    'ORI':   '2',
+    'XOR':   '3',
+    'XORI':  '3',
+
+    'ADD':   '5',
+    'ADDI':  '5',
+    'ADDU':  '6',
+    'ADDUI': '6',
+    'ADDC':  '7',
+    'ADDCI': '7',
+    'MOV':   'D',
+    'MOVI':  'D',
+    'MUL':   'E',
+    'MULI':  'E',
+    'SUB':   '9',
+    'SUBI':  '9',
+    'SUBC':  'A',
+    'SUBCI': 'A',
+    'CMP':   'B',
+    'CMPI':  'B',
+
+    'SHIFT_TYPE': '8',
+    'LSH':   '4',
+    'LSHI':  '0',
+    'ASHU':  '4',
+    'ASHUI': '2',
+
+    'LUI':  'F',
+
+    'SPECIAL_TYPE': '4',
+    'LOAD': '0',
+    'LPR':  '1',
+    'SNXB': '2',
+    'DI':   '3',
+    'STOR': '4',
+    'SPR':  '5',
+    'ZRXB': '6',
+    'EI':   '7',
+    'JAL':  '8',
+    'RETX': '9',
+    'TBIT': 'A',
+    'EXCP': 'B',
+    'TBITI':'E',
+
+    'BRANCH': 'C',
+    'JUMP': 'C',
+
+    'EQ' : '0',
+    'NE' : '1',
+    'CS' : '2',
+    'CC' : '3',
+    'HI' : '4',
+    'LS' : '5',
+    'GT' : '6',
+    'LE' : '7',
+    'FS' : '8',
+    'FC' : '9',
+    'LO' : 'A',
+    'HS' : 'B',
+    'LT' : 'C',
+    'GE' : 'D',
+    'UC' : 'E'
+}
 
 # from https://stackoverflow.com/questions/38834378/path-to-a-directory-as-argparse-argument
 def dir_path(path: str) -> str:
@@ -220,48 +188,6 @@ def replaceMacros(parts: list[str]) -> list[str]:
         else:
             toreturn.append(s)
     return toreturn
-
-
-# def ADDU(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}6{rsrc:1X}'
-
-# def ADDUI(imm: int, rdst: int) -> str: return f'6{rdst:1X}{imm:02X}'
-
-# def ADDC(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}7{rsrc:1X}'
-
-# def ADDCI(imm: int, rdst: int) -> str: return f'7{rdst:1X}{imm:02X}'
-
-# def MUL(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}E{rsrc:1X}'
-
-# def MULI(imm: int, rdst: int) -> str: return f'E{rdst:1X}{imm:02X}'
-
-# def SUB(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}9{rsrc:1X}'
-
-# def SUBI(imm: int, rdst: int) -> str: return f'9{rdst:1X}{imm:02X}'
-
-# def SUBC(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}A{rsrc:1X}'
-
-# def SUBCI(imm: int, rdst: int) -> str: return f'A{rdst:1X}{imm:02X}'
-
-# def CMP(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}B{rsrc:1X}'
-
-# def CMPI(imm: int, rdst: int) -> str: return f'B{rdst:1X}{imm:02X}'
-
-# def AND(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}1{rsrc:1X}'
-
-# def ANDI(imm: int, rdst: int) -> str: return f'1{rdst:1X}{imm:02X}'
-
-# def OR(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}2{rsrc:1X}'
-
-# def ORI(imm: int, rdst: int) -> str: return f'2{rdst:1X}{imm:02X}'
-
-# def XOR(rsrc: int, rdst: int) -> str: return f'0{rdst:1X}3{rsrc:1X}'
-
-# def XORI(imm: int, rdst: int) -> str: return f'3{rdst:1X}{imm:02X}'
-
-
-    
-
-
 
 def precompile(filename):
     f = open(filename, 'r')
@@ -344,7 +270,11 @@ def assemble(filename: str) -> None:
                 #     labelAddress //= 2
 
                 label = parts.pop(0)
-	
+
+                jpoint_instrs[label] = {
+                    'initial_immd': labelAddress,
+                    'is_odd': odd	
+                }	
                 if odd:
                     # if it is odd, we have to correct for the -1 above
                     labels[label] = labelAddress + 1
@@ -366,171 +296,171 @@ def assemble(filename: str) -> None:
 
     ram = False
     address = -1
-    # for i, x in enumerate(f):
-    #     line = x.split('#')[0] # discard comment at end of line
-    #     parts = line.split()
-    #     if len(parts) > 0 and line[0] == '@':
-    #         ram = True
-    #         break
-    #     if len(parts) > 0 and line[0] != '.' and line[0] != '`':
-    #         for part in parts:
-    #             sf.write(part + ' ')
-    #         sf.write('\n')
-    #         address = address + 1
-    #         instr = parts.pop(0).upper()
-    #         if instr == 'WAIT':
-    #             wf.write('0000\n')
-    #         elif instr in r_type_insts: # ----------------------------------------------------------------------------------------
-    #             # i.e. ADD %r1 %r2 -> 0251
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             else:
-    #                 r_src, r_dst = parts
-    #                 if r_src not in reg_codes or r_dst not in reg_codes:
-    #                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #                 else:
-    #                     wf.write(inst_codes['REGISTER_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
-    #         elif instr in i_type_insts: # ----------------------------------------------------------------------------------------
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             else:
-    #                 imm, r_dst = parts
-    #                 if r_dst not in reg_codes:
-    #                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #                 if imm[0] == '$':
-    #                     parsed_imm = int(imm[1:])
-    #                 elif imm[0] == '.':
-    #                     parsed_imm = labels[imm]
-    #                     if parsed_imm > 0xFF:
-    #                         # it's a label, but it doesn't fit in just a MOVI inst
-    #                         # so expand it to MOVI + LUI
-    #                         hex_imm = f'{parsed_imm:04X}'
-    #                         wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[2:] + '\n')
-    #                         address += 1
-    #                         wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[:2] + '\n')
-    #                         # botch job to make label dictionary still accurate
-    #                         for label in labels:
-    #                             if labels[label] > address:
-    #                                 labels[label] += 1
-    #                         continue
-    #                 else:
-    #                     sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
-    #                             +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
+    for i, x in enumerate(f):
+        line = x.split('#')[0] # discard comment at end of line
+        parts = line.split()
+        if len(parts) > 0 and line[0] == '@':
+            ram = True
+            break
+        if len(parts) > 0 and line[0] != '.' and line[0] != '`':
+            for part in parts:
+                sf.write(part + ' ')
+            sf.write('\n')
+            address = address + 1
+            instr = parts.pop(0).upper()
+            if instr == 'WAIT':
+                wf.write('0000\n')
+            elif instr in r_type_insts: # ----------------------------------------------------------------------------------------
+                # i.e. ADD %r1 %r2 -> 0251
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
+                    r_src, r_dst = parts
+                    if r_src not in reg_codes or r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                    else:
+                        wf.write(inst_codes['REGISTER_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
+            elif instr in i_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
+                    imm, r_dst = parts
+                    if r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                    if imm[0] == '$':
+                        parsed_imm = int(imm[1:])
+                    elif imm[0] == '.':
+                        parsed_imm = labels[imm]
+                        if parsed_imm > 0xFF:
+                            # it's a label, but it doesn't fit in just a MOVI inst
+                            # so expand it to MOVI + LUI
+                            hex_imm = f'{parsed_imm:04X}'
+                            wf.write(inst_codes['MOVI'] + reg_codes[r_dst] + hex_imm[2:] + '\n')
+                            address += 1
+                            wf.write(inst_codes['LUI']  + reg_codes[r_dst] + hex_imm[:2] + '\n')
+                            # botch job to make label dictionary still accurate
+                            for label in labels:
+                                if labels[label] > address:
+                                    labels[label] += 1
+                            continue
+                    else:
+                        sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found: \'{imm[0]}\'')
 
-    #                 if parsed_imm > 0xFF or parsed_imm < -128:
-    #                     sys.exit(f'ERROR: Out of range imm on line {i+1} in instruction {x}'
-    #                             +f'\n\tImmediate must be between -127 and 255, found {parsed_imm}')
-    #                 if instr in sign_ext_imm:
-    #                     if parsed_imm > 127:
-    #                         print(f'WARNING: Found large imm that will be sign extended on line {i+1} in instruction {x}'
-    #                                 +f'\n\t{parsed_imm} will become {int.from_bytes(parsed_imm.to_bytes(1, byteorder="big"), byteorder="big", signed=True)}')
-    #                         # That funkiness in that print is to cast to a byte, then back to an int using 2's C
-    #                 elif instr in zero_ext_imm:
-    #                     if parsed_imm < 0:
-    #                         print(f'WARNING: Found negative imm that will be zero extended on line {i+1} in instruction {x}'
-    #                                 +f'\n\t{parsed_imm} will become {parsed_imm & 0xFF}')
-    #                 else:
-    #                     sys.exit(f'CRASHED: Something went horribly wrong. An inst was in the i_type set, I do not know how the imm is extended')
-    #                 formatted_imm = f'{(parsed_imm & 0xFF):02X}'
-    #                 wf.write(inst_codes[instr] + reg_codes[r_dst] + formatted_imm + '\n')
-    #         elif instr in sh_type_insts: # ----------------------------------------------------------------------------------------
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             else:
-    #                 r_src, r_dst = parts
-    #                 if r_src not in reg_codes or r_dst not in reg_codes:
-    #                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #                 else:
-    #                     wf.write(inst_codes['SHIFT_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
-    #         elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             else:
-    #                 imm, r_dst = parts
-    #                 if imm[0] != '$':
-    #                     sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
-    #                             +f'\n\tExpected imm to start with: \'$\', but found \'{imm[0]}\'')
-    #                 if r_dst not in reg_codes:
-    #                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #                 else:
-    #                     parsed_imm = int(imm[1:])
-    #                     if parsed_imm > 15 or -5 > parsed_imm:
-    #                         sys.exit(f'ERROR: Out of range imm on line {i+1} in inst {x}'
-    #                                 +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
-    #                     else:  
-    #                         # formatted_imm = f'{parsed_imm:01X}'
-    #                         formatted_imm = hex((parsed_imm + (1 << 4)) % (1 << 4))[2:]
-    #                         sign_bit = parsed_imm < 0
-    #                         # TODO: Bandaid fix, ASHUI is now unsupported
-    #                         wf.write('8' + reg_codes[r_dst] + str(int(sign_bit)) + formatted_imm + '\n')
-    #         elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
-    #             if len(parts) != 1:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
-    #             else:
-    #                 displacement = parts[0]
-    #                 if displacement[0] == '$': # if displacement is imm
-    #                     parsed_disp = int(displacement[1:]) # cut off first char
-    #                     if parsed_disp > 255 or -255 > parsed_disp:
-    #                         sys.exit(f'ERROR: Out of range displacement on line {i+1} in inst {x}'
-    #                                 +f'\n\t Displacement must be between -255 and 255, found: {parsed_disp}')
-    #                 elif displacement[0] == '.': # if displacement is label
-    #                     parsed_disp = labels[displacement] - address
-    #                     if parsed_disp > 255 or -255 > parsed_disp:
-    #                         sys.exit(f'ERROR: Out of range displacement on line {i+1} in inst {x}'
-    #                                 +f'\n\t Displacement must be between -255 and 255, but label created displacement: {parsed_disp}')
-    #                 else:
-    #                     sys.exit(f'ERROR: Bad branch displacement on line {i+1} in inst {x}'
-    #                             +f'\n\tCould not recognize {displacement} as a valid imm or label')
+                    if parsed_imm > 0xFF or parsed_imm < -128:
+                        sys.exit(f'ERROR: Out of range imm on line {i+1} in instruction {x}'
+                                +f'\n\tImmediate must be between -127 and 255, found {parsed_imm}')
+                    if instr in sign_ext_imm:
+                        if parsed_imm > 127:
+                            print(f'WARNING: Found large imm that will be sign extended on line {i+1} in instruction {x}'
+                                    +f'\n\t{parsed_imm} will become {int.from_bytes(parsed_imm.to_bytes(1, byteorder="big"), byteorder="big", signed=True)}')
+                            # That funkiness in that print is to cast to a byte, then back to an int using 2's C
+                    elif instr in zero_ext_imm:
+                        if parsed_imm < 0:
+                            print(f'WARNING: Found negative imm that will be zero extended on line {i+1} in instruction {x}'
+                                    +f'\n\t{parsed_imm} will become {parsed_imm & 0xFF}')
+                    else:
+                        sys.exit(f'CRASHED: Something went horribly wrong. An inst was in the i_type set, I do not know how the imm is extended')
+                    formatted_imm = f'{(parsed_imm & 0xFF):02X}'
+                    wf.write(inst_codes[instr] + reg_codes[r_dst] + formatted_imm + '\n')
+            elif instr in sh_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
+                    r_src, r_dst = parts
+                    if r_src not in reg_codes or r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                    else:
+                        wf.write(inst_codes['SHIFT_TYPE'] + reg_codes[r_dst] + inst_codes[instr] + reg_codes[r_src] + '\n')
+            elif instr in shi_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                else:
+                    imm, r_dst = parts
+                    if imm[0] != '$':
+                        sys.exit(f'ERROR: Badly formatted imm on line {i+1} in instruction {x}'
+                                +f'\n\tExpected imm to start with: \'$\', but found \'{imm[0]}\'')
+                    if r_dst not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                    else:
+                        parsed_imm = int(imm[1:])
+                        if parsed_imm > 15 or -5 > parsed_imm:
+                            sys.exit(f'ERROR: Out of range imm on line {i+1} in inst {x}'
+                                    +f'\n\tImmediate must be between 0 and 15, found {parsed_imm}')
+                        else:  
+                            # formatted_imm = f'{parsed_imm:01X}'
+                            formatted_imm = hex((parsed_imm + (1 << 4)) % (1 << 4))[2:]
+                            sign_bit = parsed_imm < 0
+                            # TODO: Bandaid fix, ASHUI is now unsupported
+                            wf.write('8' + reg_codes[r_dst] + str(int(sign_bit)) + formatted_imm + '\n')
+            elif instr in b_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) != 1:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
+                else:
+                    displacement = parts[0]
+                    if displacement[0] == '$': # if displacement is imm
+                        parsed_disp = int(displacement[1:]) # cut off first char
+                        if parsed_disp > 255 or -255 > parsed_disp:
+                            sys.exit(f'ERROR: Out of range displacement on line {i+1} in inst {x}'
+                                    +f'\n\t Displacement must be between -255 and 255, found: {parsed_disp}')
+                    elif displacement[0] == '.': # if displacement is label
+                        parsed_disp = labels[displacement] - address
+                        if parsed_disp > 255 or -255 > parsed_disp:
+                            sys.exit(f'ERROR: Out of range displacement on line {i+1} in inst {x}'
+                                    +f'\n\t Displacement must be between -255 and 255, but label created displacement: {parsed_disp}')
+                    else:
+                        sys.exit(f'ERROR: Bad branch displacement on line {i+1} in inst {x}'
+                                +f'\n\tCould not recognize {displacement} as a valid imm or label')
 
-    #                 if parsed_disp >= 0: 
-    #                     formatted_disp = f'{parsed_disp:02X}'
-    #                 else:
-    #                     twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
-    #                     formatted_disp = f'{twos_comp_disp:02X}'
-    #                 wf.write(inst_codes['BRANCH'] + inst_codes[instr[1:]] + formatted_disp + '\n')
-    #         elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
-    #             if len(parts) != 1:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
-    #             else:
-    #                 r_src = parts[0]
-    #                 if r_src not in reg_codes:
-    #                     sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #                 else:
-    #                     wf.write(inst_codes['SPECIAL_TYPE'] + inst_codes[instr[1:]] + inst_codes['JUMP'] + reg_codes[r_src] + '\n')
-    #         # Encoding pattern for Special type Instructions
-    #         elif instr in spec_type_a_insts:
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             r_first, r_sec = parts
-    #             if r_first not in reg_codes or r_sec not in reg_codes:
-    #                 sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #             else:
-    #                 wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
-    #         elif instr in spec_type_b_insts:
-    #             if len(parts) != 2:
-    #                 sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
-    #             r_first, r_sec = parts
-    #             if r_first not in reg_codes or r_sec not in reg_codes:
-    #                 sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
-    #             else:
-    #                 wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_sec] + inst_codes[instr] + reg_codes[r_first] + '\n')
-    #         # UNIQUE INSTRUCTIONS---------------------------------------------------------------------------------------
-    #         # Unique encoding pattern for NOP
-    #         elif instr == 'NOP':
-    #             # Hardcode NOP as OR %r0 %r0
-    #             wf.write('0020\n')
-    #         elif instr == 'DI':
-    #             wf.write('4030\n')
-    #         elif instr == 'EI':
-    #             wf.write('4070\n')
-    #         elif instr == 'RETX':
-    #             wf.write('4090\n')
-    #         elif instr == 'WAIT':
-    #             wf.write('0000\n')
+                    if parsed_disp >= 0: 
+                        formatted_disp = f'{parsed_disp:02X}'
+                    else:
+                        twos_comp_disp = ((-1 * parsed_disp) ^ 255) + 1
+                        formatted_disp = f'{twos_comp_disp:02X}'
+                    wf.write(inst_codes['BRANCH'] + inst_codes[instr[1:]] + formatted_disp + '\n')
+            elif instr in j_type_insts: # ----------------------------------------------------------------------------------------
+                if len(parts) != 1:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 1, Found: {len(parts)}')
+                else:
+                    r_src = parts[0]
+                    if r_src not in reg_codes:
+                        sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                    else:
+                        wf.write(inst_codes['SPECIAL_TYPE'] + inst_codes[instr[1:]] + inst_codes['JUMP'] + reg_codes[r_src] + '\n')
+            # Encoding pattern for Special type Instructions
+            elif instr in spec_type_a_insts:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                r_first, r_sec = parts
+                if r_first not in reg_codes or r_sec not in reg_codes:
+                    sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                else:
+                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_first] + inst_codes[instr] + reg_codes[r_sec] + '\n')
+            elif instr in spec_type_b_insts:
+                if len(parts) != 2:
+                    sys.exit(f'ERROR: Wrong number of args on line {i+1} in instruction {x}\n\tExpected: 2, Found: {len(parts)}')
+                r_first, r_sec = parts
+                if r_first not in reg_codes or r_sec not in reg_codes:
+                    sys.exit(f'ERROR: Unrecognized register on line {i+1} in instruction {x}')
+                else:
+                    wf.write(inst_codes['SPECIAL_TYPE'] + reg_codes[r_sec] + inst_codes[instr] + reg_codes[r_first] + '\n')
+            # UNIQUE INSTRUCTIONS---------------------------------------------------------------------------------------
+            # Unique encoding pattern for NOP
+            elif instr == 'NOP':
+                # Hardcode NOP as OR %r0 %r0
+                wf.write('0020\n')
+            elif instr == 'DI':
+                wf.write('4030\n')
+            elif instr == 'EI':
+                wf.write('4070\n')
+            elif instr == 'RETX':
+                wf.write('4090\n')
+            elif instr == 'WAIT':
+                wf.write('0000\n')
 
 
-    #         else: # ----------------------------------------------------------------------------------------
-    #             sys.exit('Syntax Error: not a valid instruction: ' + line)
+            else: # ----------------------------------------------------------------------------------------
+                sys.exit('Syntax Error: not a valid instruction: ' + line)
 
     if ram:
         while address < RAM_START-1:
